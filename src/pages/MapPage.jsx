@@ -90,6 +90,11 @@ const MapPage = () => {
     checkIn: toIsoDay(appliedSearch.checkIn),
     checkOut: toIsoDay(appliedSearch.checkOut),
   };
+  // Mêmes filtres avancés et tri que l'accueil (transmis seulement s'ils sont actifs).
+  if (appliedSearch.minPrice != null) filters.minPrice = appliedSearch.minPrice;
+  if (appliedSearch.maxPrice != null) filters.maxPrice = appliedSearch.maxPrice;
+  if (appliedSearch.amenities?.length) filters.amenities = appliedSearch.amenities;
+  if (appliedSearch.sort && appliedSearch.sort !== "recommended") filters.sort = appliedSearch.sort;
 
   let reasonKey = null;
   if (!thirdPartyAllowed) reasonKey = "map.noConsent";

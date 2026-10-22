@@ -268,8 +268,20 @@
   color: var(--color-warning-text);
 }
 
-.booking-status--cancelled {
+.booking-status--cancelled,
+.booking-status--expired {
   background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.booking-status--declined {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.booking-item-hint {
+  margin: 0;
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 

@@ -4,9 +4,12 @@ import * as listingsController from "./listings.controller.js";
 import * as bookingsController from "../bookings/bookings.controller.js";
 import * as reviewsController from "../reviews/reviews.controller.js";
 import * as favoritesController from "../favorites/favorites.controller.js";
-import { authenticateToken, optionalAuth } from "../../middleware/auth.js";
+import * as imagesController from "./images.controller.js";
+import * as blockedPeriodsController from "./blockedPeriods.controller.js";
+import { authenticateToken, optionalAuth, requireValidToken } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
-import { day, listingFilterFields, stayOrderRefinement } from "./listings.query.js";
+import { receiveImages, MAX_IMAGES_PER_LISTING } from "../../middleware/upload.js";
+import { amenityEnum, day, listingFilterFields, stayOrderRefinement } from "./listings.query.js";
 import { MAX_NIGHTS, nightsBetween, todayDay } from "../../utils/booking.js";
 
 // Longueurs maximales identiques aux colonnes VARCHAR de prisma/schema.prisma.
@@ -33,6 +36,14 @@ const listingFields = {
   imageUrl: z.url({ protocol: /^https$/ }).max(2048).nullable().optional(),
   categoryId: text(50).min(1).nullable().optional(),
   acceptsPets: z.boolean().optional(),
+  // Équipements (doublons retirés).
+  amenities: z
+    .array(amenityEnum)
+    .max(50)
+    .transform((a) => [...new Set(a)])
+    .optional(),
+  // false : réservations soumises à l'acceptation de l'hôte (PENDING, 48 h).
+  instantBook: z.boolean().optional(),
 };
 
 // `rating` et `reviewCount` ne sont volontairement pas acceptés : ils sont calculés à partir des avis.
@@ -77,6 +88,35 @@ const availabilityQuerySchema = z
     path: ["to"],
   });
 
+const reorderImagesSchema = z
+  .object({ imageIds: z.array(z.string().min(1).max(64)).min(1).max(MAX_IMAGES_PER_LISTING) })
+  .strict()
+  .refine((d) => new Set(d.imageIds).size === d.imageIds.length, {
+    message: "imageIds contient des doublons",
+    path: ["imageIds"],
+  });
+
+const blockedPeriodSchema = z
+  .object({
+    startDate: day,
+    endDate: day,
+    reason: z.string().trim().max(200).nullable().optional(),
+  })
+  .strict()
+  .superRefine((d, ctx) => {
+    if (d.startDate < todayDay()) {
+      ctx.addIssue({ code: "custom", path: ["startDate"], message: "startDate ne peut pas être dans le passé" });
+    }
+    const nights = nightsBetween(d.startDate, d.endDate);
+    if (nights < 1) {
+      ctx.addIssue({ code: "custom", path: ["endDate"], message: "endDate doit être postérieur à startDate" });
+    } else if (nights > MAX_NIGHTS) {
+      ctx.addIssue({ code: "custom", path: ["endDate"], message: `Période limitée à ${MAX_NIGHTS} jours` });
+    }
+  });
+
+const blockedPeriodsQuerySchema = z.object({ from: day.optional() });
+
 const reviewsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
   offset: z.coerce.number().int().min(0).default(0),
@@ -88,6 +128,8 @@ router.get("/", optionalAuth, validate(listQuerySchema, "query"), listingsContro
 // Routes "/mine" déclarées avant "/:id".
 router.get("/mine", authenticateToken, listingsController.mine);
 router.get("/mine/bookings", authenticateToken, listingsController.mineBookings);
+router.get("/mine/stats", authenticateToken, listingsController.mineStats);
+router.get("/price-range", listingsController.priceRange);
 router.get("/:id", optionalAuth, listingsController.getById);
 router.post("/", authenticateToken, validate(createListingSchema), listingsController.create);
 router.patch("/:id", authenticateToken, validate(updateListingSchema), listingsController.update);
@@ -108,6 +150,39 @@ router.get(
   validate(availabilityQuerySchema, "query"),
   bookingsController.availability
 );
+
+// Photos. Ordre des contrôles du téléversement : signature du token (sans base), réception
+// multipart avec limites (taille, nombre), type réel par magic bytes, PUIS utilisateur en base.
+router.post(
+  "/:id/images",
+  requireValidToken,
+  receiveImages,
+  authenticateToken,
+  imagesController.upload
+);
+// "/order" déclaré avant "/:imageId".
+router.patch(
+  "/:id/images/order",
+  validate(reorderImagesSchema),
+  authenticateToken,
+  imagesController.reorder
+);
+router.delete("/:id/images/:imageId", authenticateToken, imagesController.remove);
+
+// Dates bloquées par l'hôte (propriétaire uniquement ; le public les voit via /availability).
+router.get(
+  "/:id/blocked-periods",
+  authenticateToken,
+  validate(blockedPeriodsQuerySchema, "query"),
+  blockedPeriodsController.list
+);
+router.post(
+  "/:id/blocked-periods",
+  validate(blockedPeriodSchema),
+  authenticateToken,
+  blockedPeriodsController.create
+);
+router.delete("/:id/blocked-periods/:periodId", authenticateToken, blockedPeriodsController.remove);
 
 router.get("/:id/reviews", validate(reviewsQuerySchema, "query"), reviewsController.listForListing);
 

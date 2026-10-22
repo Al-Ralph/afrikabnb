@@ -1,17 +1,10 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import Host from "./Host";
 import { LanguageProvider } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
-
-vi.mock(
-  "react-router-dom",
-  async () => {
-    const React = await vi.importActual("react");
-    return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  }
-);
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual("../api/client");
@@ -20,6 +13,8 @@ vi.mock("../api/client", async () => {
     api: {
       getMyListings: vi.fn(),
       getMyHostBookings: vi.fn(),
+      getHostStats: vi.fn(),
+      getBlockedPeriods: vi.fn(),
       deleteListing: vi.fn(),
       cancelBooking: vi.fn(),
       createListing: vi.fn(),
@@ -52,12 +47,32 @@ const booking = {
   listing: { id: "1", title: "Villa Lagune" },
 };
 
-const renderHost = () =>
+let currentSearch = "";
+const LocationSpy = () => {
+  currentSearch = useLocation().search;
+  return null;
+};
+
+const renderHost = (path = "/host") =>
   render(
-    <LanguageProvider>
-      <Host />
-    </LanguageProvider>
+    <MemoryRouter initialEntries={[path]}>
+      <LanguageProvider>
+        <Host />
+        <LocationSpy />
+      </LanguageProvider>
+    </MemoryRouter>
   );
+
+const stats = {
+  revenue: { XOF: { past: 135000, upcoming: 180000, total: 315000 } },
+  nightsBooked: { past: 3, upcoming: 4, total: 7 },
+  occupancy: [{ listingId: "1", title: "Villa Lagune", last30: 0.1, last90: 0.0333, next30: 0.1333, next90: 0.0444 }],
+  averageRating: 4.5,
+  reviewCount: 2,
+  listingsCount: 1,
+  pendingRequests: 0,
+  upcomingArrivals: [],
+};
 
 beforeEach(() => {
   localStorage.clear();
@@ -65,6 +80,8 @@ beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
   api.getMyListings.mockResolvedValue([listing]);
   api.getMyHostBookings.mockResolvedValue([booking]);
+  api.getHostStats.mockResolvedValue(stats);
+  api.getBlockedPeriods.mockResolvedValue([]);
   useAuth.mockReturnValue({ user: { id: "h1", name: "Awa" }, loading: false });
 });
 
@@ -80,16 +97,31 @@ describe("Host", () => {
     window.removeEventListener("afrikabnb:open-auth", onOpenAuth);
   });
 
-  test("lists my listings with upcoming bookings and the bookings received", async () => {
+  test("opens on the dashboard tab and keeps the active tab in the URL (?tab=)", async () => {
     renderHost();
+    expect(screen.getByRole("tab", { name: "Tableau de bord" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("Revenus encaissés")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Réservations" }));
+    expect(currentSearch).toBe("?tab=bookings");
+    expect(screen.getByRole("tabpanel", { name: "Réservations" })).toBeInTheDocument();
+    // Navigation au clavier entre les onglets (motif ARIA tablist).
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Réservations" }), { key: "ArrowRight" });
+    expect(currentSearch).toBe("?tab=availability");
+    expect(screen.getByRole("tab", { name: "Disponibilités" })).toHaveFocus();
+  });
+
+  test("lists my listings with upcoming bookings and the bookings received", async () => {
+    renderHost("/host?tab=listings");
     expect(await screen.findByText("Réservations à venir : 2")).toBeInTheDocument();
+    expect(screen.getByText("Réservation instantanée")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Réservations" }));
     expect(await screen.findByText("Kofi")).toBeInTheDocument();
     expect(screen.getByText("Confirmée")).toBeInTheDocument();
   });
 
   test("deletes a listing after confirmation", async () => {
     api.deleteListing.mockResolvedValue(undefined);
-    renderHost();
+    renderHost("/host?tab=listings");
     const [item] = await screen.findAllByRole("listitem");
     fireEvent.click(within(item).getByRole("button", { name: "Supprimer" }));
     expect(api.deleteListing).not.toHaveBeenCalled();
@@ -101,7 +133,7 @@ describe("Host", () => {
 
   test("cancels an upcoming booking received", async () => {
     api.cancelBooking.mockResolvedValue({ ...booking, status: "CANCELLED", guest: undefined });
-    renderHost();
+    renderHost("/host?tab=bookings");
     fireEvent.click(await screen.findByRole("button", { name: "Annuler la réservation" }));
     fireEvent.click(screen.getByRole("button", { name: "Oui, confirmer" }));
     expect(await screen.findByText("Annulée")).toBeInTheDocument();
@@ -109,10 +141,20 @@ describe("Host", () => {
     expect(screen.getByText("Kofi")).toBeInTheDocument();
   });
 
-  test("opens the creation form", async () => {
+  test("opens the creation form on the listings tab", async () => {
     renderHost();
+    await screen.findByText("Revenus encaissés");
     fireEvent.click(screen.getByRole("button", { name: "Nouvelle annonce" }));
     expect(screen.getByRole("heading", { name: "Publier une annonce" })).toBeInTheDocument();
-    await screen.findByText("Kofi");
+    expect(currentSearch).toBe("?tab=listings");
+    expect(screen.getByRole("tab", { name: "Mes annonces" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("shows the number of pending requests on the bookings tab", async () => {
+    const expiresAt = new Date(Date.now() + 5 * 3600 * 1000).toISOString();
+    api.getMyHostBookings.mockResolvedValue([booking, { ...booking, id: "b2", status: "PENDING", expiresAt }]);
+    renderHost();
+    const tab = screen.getByRole("tab", { name: /Réservations/ });
+    await waitFor(() => expect(tab).toHaveTextContent("1 demandes en attente"));
   });
 });

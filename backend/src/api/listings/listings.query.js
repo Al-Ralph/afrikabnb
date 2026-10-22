@@ -1,6 +1,14 @@
-import { Prisma } from "@prisma/client";
+import { Amenity, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { addDays, parseDay } from "../../utils/booking.js";
+import { blockingBookingWhere } from "../../utils/bookingStatus.js";
+
+// Équipements reconnus (enum Postgres "Amenity" de prisma/schema.prisma).
+export const AMENITIES = Object.values(Amenity);
+export const amenityEnum = z.enum(AMENITIES);
+
+// Tris disponibles (`recommended` : plus récentes d'abord, comportement historique).
+export const SORTS = ["recommended", "price_asc", "price_desc", "rating_desc"];
 
 // Jour calendaire "YYYY-MM-DD" (date réelle : 2026-02-30 est refusé).
 export const day = z.iso.date({ message: "Date attendue au format YYYY-MM-DD" });
@@ -19,7 +27,30 @@ export const listingFilterFields = {
   // Disponibilité : exclut les annonces ayant une réservation non annulée qui chevauche.
   checkIn: day.optional(),
   checkOut: day.optional(),
+  // "WIFI,POOL" : annonces possédant TOUS ces équipements.
+  amenities: z
+    .string()
+    .trim()
+    .max(600)
+    .transform((v) => [...new Set(v.split(",").map((a) => a.trim().toUpperCase()).filter(Boolean))])
+    .pipe(z.array(amenityEnum).max(AMENITIES.length))
+    .optional(),
+  sort: z.enum(SORTS).default("recommended"),
 };
+
+// orderBy Prisma du tri (id en dernier critère : pagination stable).
+export function listingOrderBy(sort = "recommended") {
+  switch (sort) {
+    case "price_asc":
+      return [{ pricePerNight: "asc" }, { id: "asc" }];
+    case "price_desc":
+      return [{ pricePerNight: "desc" }, { id: "asc" }];
+    case "rating_desc":
+      return [{ rating: { sort: "desc", nulls: "last" } }, { reviewCount: "desc" }, { id: "asc" }];
+    default:
+      return [{ createdAt: "desc" }, { id: "asc" }];
+  }
+}
 
 export const stayOrderRefinement = [
   (d) => !(d.checkIn && d.checkOut) || d.checkOut > d.checkIn,
@@ -50,9 +81,10 @@ export async function findListingIdsByText(prisma, text) {
 
 // Construit le `where` Prisma à partir des filtres validés. `textMatchIds` : résultat de
 // findListingIdsByText ; sans lui, repli sur ILIKE (insensible à la casse, pas aux accents).
-export function buildListingWhere(query, { textMatchIds } = {}) {
-  const { categoryId, minPrice, maxPrice, pets, guests, checkIn, checkOut } = query;
-  const where = {};
+// Recherche publique : uniquement les annonces ACTIVE (les HIDDEN sont modérées).
+export function buildListingWhere(query, { textMatchIds, now = new Date() } = {}) {
+  const { categoryId, minPrice, maxPrice, pets, guests, checkIn, checkOut, amenities } = query;
+  const where = { status: "ACTIVE" };
   const text = searchText(query);
   if (text && textMatchIds) {
     where.id = { in: textMatchIds };
@@ -70,16 +102,21 @@ export function buildListingWhere(query, { textMatchIds } = {}) {
     if (minPrice != null) where.pricePerNight.gte = new Prisma.Decimal(minPrice);
     if (maxPrice != null) where.pricePerNight.lte = new Prisma.Decimal(maxPrice);
   }
+  if (amenities?.length) where.amenities = { hasEvery: amenities };
   if (checkIn || checkOut) {
     // Une seule date fournie : on vérifie la nuit correspondante.
     const start = checkIn ?? addDays(checkOut, -1);
     const end = checkOut ?? addDays(checkIn, 1);
+    // Réservations bloquantes (CONFIRMED, PENDING non expirée) et dates bloquées par l'hôte.
     where.bookings = {
       none: {
-        status: { not: "CANCELLED" },
+        ...blockingBookingWhere(now),
         checkIn: { lt: parseDay(end) },
         checkOut: { gt: parseDay(start) },
       },
+    };
+    where.blockedPeriods = {
+      none: { startDate: { lt: parseDay(end) }, endDate: { gt: parseDay(start) } },
     };
   }
   return where;

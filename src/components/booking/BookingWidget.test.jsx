@@ -134,4 +134,33 @@ describe("BookingWidget", () => {
     expect(widget().queryByRole("button", { name: "Réserver" })).not.toBeInTheDocument();
     expect(api.getAvailability).not.toHaveBeenCalled();
   });
+
+  test("on-request listing (instantBook=false): « Demande de réservation », PENDING result with the 48 h notice", async () => {
+    api.createBooking.mockResolvedValue({
+      id: "b2",
+      checkIn: `${nextYear}-06-10`,
+      checkOut: `${nextYear}-06-13`,
+      totalPrice: 135000,
+      currency: "XOF",
+      status: "PENDING",
+    });
+    await renderWidget({ listing: { ...listing, instantBook: false } });
+    expect(widget().getByText(/Cet hôte valide chaque demande/)).toBeInTheDocument();
+    expect(widget().queryByRole("button", { name: "Réserver" })).not.toBeInTheDocument();
+    fireEvent.click(widget().getByRole("button", { name: "Demande de réservation" }));
+    expect(await screen.findByText("Demande envoyée")).toBeInTheDocument();
+    expect(screen.getByText(/L'hôte a 48 h pour répondre/)).toBeInTheDocument();
+    expect(screen.queryByText("Réservation confirmée !")).not.toBeInTheDocument();
+  });
+
+  test("dates blocked by the host (returned in availability.booked) cannot be booked", async () => {
+    api.getAvailability.mockResolvedValue({
+      listingId: "7",
+      booked: [{ checkIn: `${nextYear}-06-11`, checkOut: `${nextYear}-06-12` }],
+      blocked: [{ startDate: `${nextYear}-06-11`, endDate: `${nextYear}-06-12` }],
+    });
+    await renderWidget();
+    await waitFor(() => expect(widget().getByRole("alert")).toHaveTextContent("Ces dates ne sont plus disponibles"));
+    expect(widget().getByRole("button", { name: "Réserver" })).toBeDisabled();
+  });
 });

@@ -5,8 +5,10 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 async function request(path, options = {}) {
   const base = API_BASE.replace(/\/$/, "");
   const url = base ? `${base}${path}` : path;
+  // FormData (téléversement) : le navigateur fixe lui-même multipart/form-data et sa frontière.
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    ...(options.body != null ? { "Content-Type": "application/json" } : {}),
+    ...(options.body != null && !isForm ? { "Content-Type": "application/json" } : {}),
     ...options.headers,
   };
   const token = localStorage.getItem("afrikabnb_token");
@@ -57,8 +59,27 @@ export function normalizeListing(item) {
     currency: item.currency || "XOF",
     reviewCount: Number(item.reviewCount) || 0,
     isFavorite: Boolean(item.isFavorite),
+    // Photos triées ({ id, url, alt, position }) ; repli sur l'image de couverture.
+    images: Array.isArray(item.images)
+      ? item.images
+      : item.imageUrl || item.image
+        ? [{ id: null, url: item.imageUrl || item.image, alt: item.title ?? null, position: 0 }]
+        : [],
+    amenities: Array.isArray(item.amenities) ? item.amenities : [],
+    instantBook: item.instantBook !== false,
   };
 }
+
+// Équipements reconnus par l'API (enum Amenity) ; libellés à la charge de l'UI.
+export const AMENITIES = [
+  "WIFI", "AIR_CONDITIONING", "FAN", "POOL", "PARKING", "KITCHEN", "WASHER", "TV", "WORKSPACE",
+  "GENERATOR", "SOLAR_POWER", "WATER_TANK", "WATER_HEATER", "SECURITY", "CCTV", "BREAKFAST",
+  "SEA_VIEW", "BEACH_ACCESS", "GARDEN", "TERRACE", "BBQ", "MOSQUITO_NETS", "AIRPORT_SHUTTLE",
+  "HOUSEKEEPING",
+];
+
+// Tris acceptés par GET /api/listings (et listings-in-bounds).
+export const LISTING_SORTS = ["recommended", "price_asc", "price_desc", "rating_desc"];
 
 // Réservation API -> UI : montant numérique et annonce normalisée.
 export function normalizeBooking(item) {
@@ -79,7 +100,18 @@ export function toIsoDay(value) {
 }
 
 // Construit la query string des annonces en omettant les paramètres vides.
-export function buildListingsQuery({ where, categoryId, pets, guests, checkIn, checkOut } = {}) {
+export function buildListingsQuery({
+  where,
+  categoryId,
+  pets,
+  guests,
+  checkIn,
+  checkOut,
+  minPrice,
+  maxPrice,
+  amenities,
+  sort,
+} = {}) {
   const params = new URLSearchParams();
   const trimmed = typeof where === "string" ? where.trim() : "";
   if (trimmed) params.set("where", trimmed);
@@ -90,6 +122,14 @@ export function buildListingsQuery({ where, categoryId, pets, guests, checkIn, c
   const outDay = toIsoDay(checkOut);
   if (inDay) params.set("checkIn", inDay);
   if (outDay) params.set("checkOut", outDay);
+  const isPrice = (v) => v !== "" && v != null && Number.isFinite(Number(v)) && Number(v) >= 0;
+  if (isPrice(minPrice)) params.set("minPrice", String(Number(minPrice)));
+  if (isPrice(maxPrice)) params.set("maxPrice", String(Number(maxPrice)));
+  const codes = (Array.isArray(amenities) ? amenities : typeof amenities === "string" ? amenities.split(",") : [])
+    .map((a) => String(a).trim())
+    .filter(Boolean);
+  if (codes.length) params.set("amenities", codes.join(","));
+  if (sort && sort !== "recommended") params.set("sort", sort);
   return params.toString();
 }
 
@@ -113,8 +153,9 @@ function withQuery(path, params) {
 export const api = {
   async getListings(params = {}) {
     const q = buildListingsQuery(params);
-    const { data, total } = await request(`/api/listings${q ? `?${q}` : ""}`);
-    return { data: (data || []).map(normalizeListing), total: total || 0 };
+    const { data, total, priceRange } = await request(`/api/listings${q ? `?${q}` : ""}`);
+    // priceRange : { min, max } global (curseurs de prix), indépendant des filtres.
+    return { data: (data || []).map(normalizeListing), total: total || 0, priceRange };
   },
 
   async getListing(id) {
@@ -137,6 +178,22 @@ export const api = {
 
   async getMe() {
     return request("/api/auth/me");
+  },
+
+  // --- Mot de passe oublié ---
+  // Toujours 200 avec le même message (que le compte existe ou non). 429 si trop de demandes.
+  async forgotPassword(email) {
+    return request("/api/auth/forgot-password", jsonBody("POST", { email }));
+  },
+
+  // 400 si le jeton est invalide, expiré ou déjà utilisé.
+  async resetPassword(token, newPassword) {
+    return request("/api/auth/reset-password", jsonBody("POST", { token, newPassword }));
+  },
+
+  // { min, max } des prix des annonces publiques (null sans annonce).
+  async getPriceRange() {
+    return request("/api/listings/price-range");
   },
 
   // Annonces visibles sur la carte, avec les mêmes filtres facultatifs que getListings.
@@ -202,6 +259,58 @@ export const api = {
     return (data || []).map(normalizeBooking);
   },
 
+  // Tableau de bord hôte : revenus, nuits, occupation, prochaines arrivées, note moyenne.
+  async getHostStats() {
+    const stats = await request("/api/listings/mine/stats");
+    return { ...stats, upcomingArrivals: (stats.upcomingArrivals || []).map(normalizeBooking) };
+  },
+
+  // --- Photos (hôte propriétaire) ---
+  // files : File[] / FileList (JPEG, PNG, WebP ; 5 Mo par image, 10 images max par annonce).
+  // Retourne toutes les photos de l'annonce, triées.
+  async uploadListingImages(listingId, files) {
+    const form = new FormData();
+    Array.from(files || []).forEach((f) => form.append("images", f));
+    const { data } = await request(`/api/listings/${enc(listingId)}/images`, { method: "POST", body: form });
+    return data || [];
+  },
+
+  async deleteListingImage(listingId, imageId) {
+    const { data } = await request(`/api/listings/${enc(listingId)}/images/${enc(imageId)}`, {
+      method: "DELETE",
+    });
+    return data || [];
+  },
+
+  // imageIds : tous les identifiants des photos, dans le nouvel ordre (le premier = couverture).
+  async reorderListingImages(listingId, imageIds) {
+    const { data } = await request(
+      `/api/listings/${enc(listingId)}/images/order`,
+      jsonBody("PATCH", { imageIds })
+    );
+    return data || [];
+  },
+
+  // --- Dates bloquées (hôte propriétaire) ---
+  async getBlockedPeriods(listingId, { from } = {}) {
+    const params = new URLSearchParams();
+    if (toIsoDay(from)) params.set("from", toIsoDay(from));
+    const { data } = await request(withQuery(`/api/listings/${enc(listingId)}/blocked-periods`, params));
+    return data || [];
+  },
+
+  async createBlockedPeriod(listingId, { startDate, endDate, reason }) {
+    const body = { startDate: toIsoDay(startDate), endDate: toIsoDay(endDate) };
+    if (reason) body.reason = reason;
+    return request(`/api/listings/${enc(listingId)}/blocked-periods`, jsonBody("POST", body));
+  },
+
+  async deleteBlockedPeriod(listingId, periodId) {
+    await request(`/api/listings/${enc(listingId)}/blocked-periods/${enc(periodId)}`, {
+      method: "DELETE",
+    });
+  },
+
   // --- Réservations ---
   async getMyBookings() {
     const { data } = await request("/api/users/me/bookings");
@@ -218,6 +327,19 @@ export const api = {
   async cancelBooking(bookingId) {
     return normalizeBooking(
       await request(`/api/bookings/${enc(bookingId)}/cancel`, { method: "PATCH" })
+    );
+  },
+
+  // Hôte : accepter / refuser une demande PENDING (409 si expirée ou déjà traitée).
+  async confirmBooking(bookingId) {
+    return normalizeBooking(
+      await request(`/api/bookings/${enc(bookingId)}/confirm`, { method: "PATCH" })
+    );
+  },
+
+  async declineBooking(bookingId) {
+    return normalizeBooking(
+      await request(`/api/bookings/${enc(bookingId)}/decline`, { method: "PATCH" })
     );
   },
 
@@ -242,6 +364,52 @@ export const api = {
       `/api/bookings/${enc(bookingId)}/review`,
       jsonBody("POST", { rating: Number(rating), comment })
     );
+  },
+
+  // --- Administration (rôle ADMIN ; 401 / 403 sinon) ---
+  async getAdminStats() {
+    return request("/api/admin/stats");
+  },
+
+  async getAdminUsers({ q, role, limit, offset } = {}) {
+    const params = new URLSearchParams();
+    if (typeof q === "string" && q.trim()) params.set("q", q.trim());
+    if (role) params.set("role", role);
+    if (limit != null) params.set("limit", String(limit));
+    if (offset != null) params.set("offset", String(offset));
+    return request(withQuery("/api/admin/users", params));
+  },
+
+  async updateUserRole(userId, role) {
+    return request(`/api/admin/users/${enc(userId)}/role`, jsonBody("PATCH", { role }));
+  },
+
+  async getAdminListings({ q, status, limit, offset } = {}) {
+    const params = new URLSearchParams();
+    if (typeof q === "string" && q.trim()) params.set("q", q.trim());
+    if (status) params.set("status", status);
+    if (limit != null) params.set("limit", String(limit));
+    if (offset != null) params.set("offset", String(offset));
+    const res = await request(withQuery("/api/admin/listings", params));
+    return { ...res, data: (res.data || []).map(normalizeListing) };
+  },
+
+  async updateListingStatus(listingId, status) {
+    return normalizeListing(
+      await request(`/api/admin/listings/${enc(listingId)}/status`, jsonBody("PATCH", { status }))
+    );
+  },
+
+  async getAdminReviews({ limit, offset } = {}) {
+    const params = new URLSearchParams();
+    if (limit != null) params.set("limit", String(limit));
+    if (offset != null) params.set("offset", String(offset));
+    return request(withQuery("/api/admin/reviews", params));
+  },
+
+  // -> { listing: { id, rating, reviewCount } } (note recalculée)
+  async deleteReview(reviewId) {
+    return request(`/api/admin/reviews/${enc(reviewId)}`, { method: "DELETE" });
   },
 };
 
