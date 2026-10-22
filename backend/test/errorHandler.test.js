@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Prisma } from "@prisma/client";
 import { errorHandler } from "../src/middleware/errorHandler.js";
 
-function run(err) {
+function run(err, logged = []) {
   const res = {
     headersSent: false,
     statusCode: 200,
@@ -17,13 +17,13 @@ function run(err) {
       return this;
     },
   };
-  const originalError = console.error;
-  console.error = () => {};
-  try {
-    errorHandler(err, { method: "GET", originalUrl: "/test" }, res, () => {});
-  } finally {
-    console.error = originalError;
-  }
+  const req = {
+    id: "req-test-1234",
+    method: "GET",
+    originalUrl: "/test",
+    log: { error: (...args) => logged.push(args) },
+  };
+  errorHandler(err, req, res, () => {});
   return res;
 }
 
@@ -44,8 +44,26 @@ test("requête brute en échec de sérialisation / interblocage PostgreSQL → 4
 test("autre erreur Prisma ou erreur inattendue → 500 générique", () => {
   const raw = run(prismaError("P2010", { code: "42P01" }));
   assert.equal(raw.statusCode, 500);
-  assert.deepEqual(raw.body, { error: "Erreur serveur" });
-  assert.deepEqual(run(new Error("secret interne")).body, { error: "Erreur serveur" });
+  assert.deepEqual(raw.body, { error: "Erreur serveur", requestId: "req-test-1234" });
+  assert.deepEqual(run(new Error("secret interne")).body, {
+    error: "Erreur serveur",
+    requestId: "req-test-1234",
+  });
+});
+
+test("5xx : erreur complète journalisée avec l'id de requête, jamais renvoyée au client", () => {
+  const logged = [];
+  const res = run(new Error("secret interne"), logged);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][0].err.message, "secret interne");
+  assert.equal(logged[0][0].reqId, "req-test-1234");
+  assert.ok(!JSON.stringify(res.body).includes("secret interne"));
+});
+
+test("4xx : pas de journal d'erreur", () => {
+  const logged = [];
+  run(Object.assign(new Error("Non autorisé"), { statusCode: 401 }), logged);
+  assert.equal(logged.length, 0);
 });
 
 test("erreur métier (httpError) : statut et message conservés", () => {

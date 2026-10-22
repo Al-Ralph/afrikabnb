@@ -4,30 +4,29 @@ import Header from "./Header";
 import { LanguageProvider } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return {
       Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children),
       useLocation: () => ({ pathname: "/profil" }),
     };
-  },
-  { virtual: true }
+  }
 );
-jest.mock("../context/AuthContext", () => ({ useAuth: jest.fn() }));
-jest.mock("./LanguageSelector", () => () => <div>LanguageSelector</div>);
-jest.mock("./AuthModal", () => ({ isOpen }) => (isOpen ? <div role="dialog">AuthModal</div> : null));
+vi.mock("../context/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("./LanguageSelector", () => ({ default: () => <div>LanguageSelector</div> }));
+vi.mock("./AuthModal", () => ({ default: ({ isOpen }) => (isOpen ? <div role="dialog">AuthModal</div> : null) }));
 
 const kofi = { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi", avatar: null };
 
 function setup(authOverrides = {}) {
   const auth = {
     user: null,
-    logout: jest.fn(),
+    logout: vi.fn(),
     authOpen: false,
-    openAuth: jest.fn(),
-    closeAuth: jest.fn(),
+    openAuth: vi.fn(),
+    closeAuth: vi.fn(),
     ...authOverrides,
   };
   useAuth.mockReturnValue(auth);

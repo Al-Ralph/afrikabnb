@@ -5,29 +5,28 @@ import { LanguageProvider } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
-jest.mock("../context/AuthContext", () => ({ useAuth: jest.fn() }));
-jest.mock("../context/FavoritesContext", () => ({ useFavorites: jest.fn() }));
-jest.mock("../components/Footer", () => () => <footer>Footer</footer>);
+vi.mock("../context/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("../context/FavoritesContext", () => ({ useFavorites: vi.fn() }));
+vi.mock("../components/Footer", () => ({ default: () => <footer>Footer</footer> }));
 
 const villa = { id: "ck-villa", title: "Villa", location: "Lomé", price: 45000, image: "https://img/v.jpg" };
 
 function setup({ user = { id: "u1" }, fav = {} } = {}) {
-  const auth = { user, loading: false, openAuth: jest.fn() };
+  const auth = { user, loading: false, openAuth: vi.fn() };
   const favorites = {
     favorites: [],
     loading: false,
     error: null,
-    reload: jest.fn(),
+    reload: vi.fn(),
     isFavorite: () => true,
-    toggleFavorite: jest.fn(),
+    toggleFavorite: vi.fn(),
     ...fav,
   };
   useAuth.mockReturnValue(auth);

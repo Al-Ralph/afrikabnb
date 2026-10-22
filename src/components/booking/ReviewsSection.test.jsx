@@ -4,9 +4,9 @@ import ReviewsSection from "./ReviewsSection";
 import { LanguageProvider } from "../../context/LanguageContext";
 import { api } from "../../api/client";
 
-jest.mock("../../api/client", () => {
-  const actual = jest.requireActual("../../api/client");
-  return { ...actual, api: { getReviews: jest.fn() } };
+vi.mock("../../api/client", async () => {
+  const actual = await vi.importActual("../../api/client");
+  return { ...actual, api: { getReviews: vi.fn() } };
 });
 
 const review = (i) => ({

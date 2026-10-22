@@ -2,7 +2,7 @@
 
 Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. Projet étudiant / portfolio réalisé à Lomé (Togo).
 
-- **Frontend** : React 19 (Create React App), à la racine du dépôt.
+- **Frontend** : React 19 (Vite), à la racine du dépôt.
 - **Backend** : API REST Node.js / Express + Prisma + PostgreSQL (hébergé sur Supabase), dans `backend/` (documentation détaillée des endpoints : [`backend/README.md`](backend/README.md)).
 
 > Captures d’écran : non disponibles pour l’instant.
@@ -13,7 +13,7 @@ Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. P
 
 | Couche | Technologies |
 |---|---|
-| Frontend | React 19, react-scripts 5 (Create React App), react-router 7, Context API, CSS |
+| Frontend | React 19, Vite 8, react-router 7, Context API, CSS |
 | Backend | Node.js, Express 4 (modules ESM), Prisma 5, zod, jsonwebtoken, bcryptjs, helmet, express-rate-limit |
 | Base de données | PostgreSQL (Supabase en production ; PostgreSQL 16 en local via Docker, facultatif) |
 | Services externes | Google Maps JavaScript API / Places (optionnel, après consentement), OpenStreetMap Nominatim (géocodage côté serveur), images Unsplash |
@@ -83,17 +83,17 @@ Dans un second terminal, à la racine du dépôt :
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
-L’application tourne sur **http://localhost:3000**. En développement, le champ `proxy` du `package.json` redirige `/api/*` vers `http://localhost:4000` : aucune variable n’est obligatoire.
+L’application tourne sur **http://localhost:3000**. En développement, le proxy de `vite.config.js` redirige `/api/*` (et `/health`) vers `http://localhost:4000` : aucune variable n’est obligatoire.
 
 Variables optionnelles (fichier `.env` à la racine, modèle : `.env.example`) :
 
 | Variable | Rôle |
 |---|---|
-| `REACT_APP_GOOGLE_MAPS_API_KEY` | Active l’autocomplétion des destinations et la carte Google. Sans clé, la page `/carte` affiche une liste. |
-| `REACT_APP_API_URL` | URL de l’API à utiliser à la place du proxy (backend sur une autre machine / un autre port). |
+| `VITE_GOOGLE_MAPS_API_KEY` | Active l’autocomplétion des destinations et la carte Google. Sans clé, la page `/carte` affiche une liste. |
+| `VITE_API_URL` | URL de l’API à utiliser à la place du proxy (backend sur une autre machine / un autre port). |
 
 Si l’API est injoignable, l’accueil affiche des annonces de démonstration statiques (`src/data/listings.js`).
 
@@ -119,12 +119,13 @@ Le seed est idempotent (relançable sans doublon) : 20 annonces réparties sur l
 
 | Commande | Où | Contenu |
 |---|---|---|
-| `npm test` | racine | Jest + Testing Library, mode watch (`CI=true npm test` pour une exécution unique) : 214 tests |
+| `npm test` | racine | Vitest + Testing Library, exécution unique (`npm run test:watch` pour le mode watch) : 214 tests |
 | `npm test` | `backend/` | `node --test` : 22 tests sur la logique métier (nuits, prix, chevauchement de dates, moyenne des notes, filtres de recherche) |
 | `npm run build` | racine | Build de production dans `build/` |
+| `npm run lint` | racine | ESLint (config plate `eslint.config.js` : règles react-app, hooks, accessibilité JSX) |
 | `npm audit` | `backend/` | 0 vulnérabilité au 21/10/2026 |
 
-Taille du build (gzip) : bundle principal ≈ 123 kB, sans autre chunk significatif (la scène 3D three.js a été retirée le 22/10/2026).
+Taille du build (gzip) : bundle principal ≈ 119 kB (Vite 8), sans autre chunk significatif (la scène 3D three.js a été retirée le 22/10/2026).
 
 ---
 
@@ -132,7 +133,9 @@ Taille du build (gzip) : bundle principal ≈ 123 kB, sans autre chunk significa
 
 ```
 afrikabnb/
-├── public/                 # index.html, robots.txt, llms.txt
+├── index.html              # point d’entrée Vite (meta SEO, manifest)
+├── vite.config.js          # Vite : proxy /api, build, config Vitest
+├── public/                 # favicon, manifest, robots.txt, llms.txt
 ├── src/
 │   ├── api/client.js       # appels à l’API
 │   ├── components/         # UI : recherche, cartes, booking/, host/, profile/, map/, Hero (bandeau d’accueil)
@@ -164,6 +167,5 @@ afrikabnb/
 | Une seule image par annonce (URL) | Galerie et upload d’images |
 | Token JWT stocké en `localStorage` (exposé en cas de XSS) | Cookie `httpOnly` + refresh token |
 | Modes de calendrier « Mois » / « Flexibles » non implémentés (affichent « à venir ») ; l’option de flexibilité ±jours n’est pas prise en compte par la recherche | Implémenter côté API et UI |
-| Create React App est déprécié | Migration vers Vite envisagée |
-| Déploiement du frontend non décrit (pas de conteneur) | Hébergement statique du `build/` + `REACT_APP_API_URL` |
+| Déploiement du frontend non décrit (pas de conteneur) | Hébergement statique du `build/` + `VITE_API_URL` |
 | Index géographique : index B-tree composite `(latitude, longitude)`, pas un index `SPATIAL` | Extension PostGIS (disponible sur Supabase) si le volume l’exige |

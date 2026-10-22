@@ -4,13 +4,12 @@ import CookieBanner from "./CookieBanner";
 import { ConsentProvider } from "../context/ConsentContext";
 import { LanguageProvider } from "../context/LanguageContext";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
 
 const renderBanner = () =>

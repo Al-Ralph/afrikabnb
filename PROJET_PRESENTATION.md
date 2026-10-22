@@ -60,11 +60,11 @@ Développement d’une application web full-stack de réservation de logements (
 ## Technologies utilisées
 
 ### Frontend
-• **React 19** (Create React App / react-scripts 5) avec hooks et **React Router 7**
+• **React 19** (Vite 8) avec hooks et **React Router 7**
 • **Context API** pour l’état global (authentification, langue, recherche, favoris, consentement)
 • **Google Maps JavaScript API / Places** pour l’autocomplétion et la carte (après consentement)
 • **CSS** (variables, Flexbox, Grid, animations)
-• **Jest + Testing Library** : 214 tests
+• **Vitest + Testing Library** : 214 tests
 
 ### Backend
 • **Node.js** avec **Express 4** (modules ESM)
@@ -85,7 +85,7 @@ Projet 100 % JavaScript (pas de TypeScript).
 • **Docker** pour le backend : image de l’API (connectée à Supabase) ; **Docker Compose** pour une pile locale facultative API + PostgreSQL 16 avec volume persistant
 • **Health check** PostgreSQL (`pg_isready`) en local : l’API attend que la base soit prête ; migrations appliquées au démarrage du conteneur (`prisma migrate deploy`), API exécutée en utilisateur non-root
 • **Variables d’environnement validées au démarrage** (refus de démarrer en production si `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` ou `CORS_ORIGIN` est absent ou invalide ; avertissement si la connexion à la base n’impose pas SSL)
-• **Proxy de développement** React vers l’API
+• **Proxy de développement** Vite vers l’API
 • Le frontend n’est pas conteneurisé
 
 ---
@@ -117,7 +117,7 @@ Une seule application Express, découpée en modules par domaine (`backend/src/a
 • **Pagination** des résultats (limit/offset)
 • **Index de base de données** sur les colonnes filtrées (voir ci-dessus)
 • **Sélection de champs** ciblée dans les requêtes Prisma
-• **Lazy loading** des images et **bundle léger** : ≈ 123 kB gzip ; l’ancienne scène 3D (three.js, ~279 kB gzip et ~16 Mo de modèles/textures) a été remplacée par un bandeau CSS
+• **Lazy loading** des images et **bundle léger** : ≈ 119 kB gzip ; l’ancienne scène 3D (three.js, ~279 kB gzip et ~16 Mo de modèles/textures) a été remplacée par un bandeau CSS
 
 ---
 
@@ -147,7 +147,7 @@ Le seed est refusé si `NODE_ENV=production`, il ne s’exécute donc pas dans l
 
 ### Variables d’environnement
 • **Backend** : `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGIN`, `PORT`, `TRUST_PROXY`, `DIRECT_URL`, `POSTGRES_*` (Compose local)
-• **Frontend** : `REACT_APP_API_URL` (optionnelle), `REACT_APP_GOOGLE_MAPS_API_KEY` (optionnelle)
+• **Frontend** : `VITE_API_URL` (optionnelle), `VITE_GOOGLE_MAPS_API_KEY` (optionnelle)
 
 ---
 
@@ -157,7 +157,7 @@ Le seed est refusé si `NODE_ENV=production`, il ne s’exécute donc pas dans l
 • **Fiabilité** : 214 tests frontend et 22 tests backend, réservation protégée contre la double-réservation concurrente
 • **Interface multilingue** (5 langues) avec consentement cookies et pages légales
 • **Base saine pour évoluer** : domaines séparés, migrations versionnées, seed reproductible (20 annonces, 9 catégories, 3 comptes de démo)
-• **Limites actuelles** : pas de paiement en ligne, pas de messagerie hôte/voyageur, une seule image par annonce, modes de calendrier « Mois » / « Flexibles » non implémentés, déploiement du frontend non décrit, Create React App déprécié (migration Vite envisagée)
+• **Limites actuelles** : pas de paiement en ligne, pas de messagerie hôte/voyageur, une seule image par annonce, modes de calendrier « Mois » / « Flexibles » non implémentés, déploiement du frontend non décrit
 
 ---
 
@@ -168,7 +168,7 @@ Le seed est refusé si `NODE_ENV=production`, il ne s’exécute donc pas dans l
 • **Intégration d’APIs externes** : Google Maps JavaScript API / Places, OpenStreetMap Nominatim
 • **Architecture** : monolithe modulaire découpé par domaine, API REST
 • **Sécurité** : JWT, bcrypt, validation zod, rate limiting, helmet, configuration validée au démarrage
-• **Tests** : Jest + Testing Library, `node --test`
+• **Tests** : Vitest + Testing Library, `node --test`
 • **DevOps** : Docker, Docker Compose, variables d’environnement
 • **Internationalisation** : 5 langues
 • **Conformité** : consentement cookies, pages légales

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useConsent } from "../context/ConsentContext";
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const PLACES_TIMEOUT_MS = 5000;
 
 const placesAvailable = () => !!window.google?.maps?.places;
@@ -18,7 +18,7 @@ export function useGoogleMapsScript() {
       return;
     }
     if (!GOOGLE_MAPS_API_KEY) {
-      setError("REACT_APP_GOOGLE_MAPS_API_KEY manquant");
+      setError("VITE_GOOGLE_MAPS_API_KEY manquant");
       return;
     }
     if (placesAvailable()) {
