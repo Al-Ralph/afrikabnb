@@ -11,7 +11,7 @@ const PlacesAutocompleteInput = ({ value, onChange, placeholder, id, className, 
   const onChangeRef = useRef(onChange);
   const { thirdPartyAllowed } = useConsent();
   const { loaded, error, hasKey } = useGoogleMapsScript();
-  const mapsKeyConfigured = !!process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  const mapsKeyConfigured = !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
     onChangeRef.current = onChange;

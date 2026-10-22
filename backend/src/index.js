@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { logger, httpLogger } from "./config/logger.js";
 import prisma from "./config/db.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import authRoutes from "./api/auth/auth.routes.js";
@@ -16,6 +17,7 @@ const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", config.trustProxy);
 
+app.use(httpLogger);
 app.use(helmet());
 app.use(cors({ origin: config.corsOrigins }));
 
@@ -53,11 +55,11 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
-  console.log(`AfrikaBnB API listening on http://localhost:${config.port}`);
+  logger.info(`AfrikaBnB API listening on http://localhost:${config.port}`);
 });
 
 function shutdown(signal) {
-  console.log(`${signal} reçu, arrêt de l'API...`);
+  logger.info(`${signal} reçu, arrêt de l'API...`);
   setTimeout(() => process.exit(1), 10000).unref();
   server.close(async () => {
     await prisma.$disconnect();

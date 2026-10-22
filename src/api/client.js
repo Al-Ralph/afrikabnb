@@ -1,6 +1,6 @@
-// Sans REACT_APP_API_URL : chemins relatifs (même origine). En développement, le proxy
-// de package.json redirige vers le backend ; en production, l'API est servie sur la même origine.
-const API_BASE = process.env.REACT_APP_API_URL || "";
+// Sans VITE_API_URL : chemins relatifs (même origine). En développement, le proxy
+// de vite.config.js redirige vers le backend ; en production, l'API est servie sur la même origine.
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 async function request(path, options = {}) {
   const base = API_BASE.replace(/\/$/, "");
@@ -32,13 +32,13 @@ async function request(path, options = {}) {
 }
 
 // Vrai si le backend est injoignable : erreur réseau, ou 5xx hors production (le proxy de
-// développement de CRA répond 500 quand le backend n'est pas démarré). En production, un 5xx
+// développement de Vite répond 500 quand le backend n'est pas démarré). En production, un 5xx
 // est une vraie panne serveur et doit être affiché, pas masqué par les données de démo.
 export function isApiUnreachable(err) {
   if (!err) return false;
   if (err.network === true) return true;
   return (
-    process.env.NODE_ENV !== "production" &&
+    !import.meta.env.PROD &&
     typeof err.status === "number" &&
     err.status >= 500
   );

@@ -80,7 +80,7 @@ const MapPage = () => {
   const { appliedSearch } = useSearch();
   const { thirdPartyAllowed, openCookieManager } = useConsent();
   const { loaded, error } = useGoogleMapsScript();
-  const keyConfigured = !!process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  const keyConfigured = !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const mapReady = thirdPartyAllowed && keyConfigured && loaded && !error && !!window.google?.maps?.Map;
   const mapLoading = thirdPartyAllowed && keyConfigured && !loaded && !error;
 

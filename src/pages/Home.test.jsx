@@ -6,33 +6,32 @@ import { SearchProvider, useSearch } from "../context/SearchContext";
 import { api } from "../api/client";
 import { listings as mockListings } from "../data/listings";
 
-const mockSetUrlParams = jest.fn();
+const mockSetUrlParams = vi.fn();
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return {
       Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children),
       useSearchParams: () => [new URLSearchParams(""), mockSetUrlParams],
     };
-  },
-  { virtual: true }
+  }
 );
 
-jest.mock("../api/client", () => {
-  const actual = jest.requireActual("../api/client");
-  return { ...actual, api: { getListings: jest.fn() } };
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual("../api/client");
+  return { ...actual, api: { getListings: vi.fn() } };
 });
 
-jest.mock("../components/Hero", () => () => <div>Hero</div>);
-jest.mock("../components/Footer", () => () => <footer>Footer</footer>);
+vi.mock("../components/Hero", () => ({ default: () => <div>Hero</div> }));
+vi.mock("../components/Footer", () => ({ default: () => <footer>Footer</footer> }));
 
 // Barre de recherche simplifiée : modifie le brouillon puis applique la recherche.
-jest.mock("../components/SearchBar", () => {
-  const React = require("react");
-  const { useSearch: useSearchCtx } = require("../context/SearchContext");
-  return function MockSearchBar() {
+vi.mock("../components/SearchBar", async () => {
+  const React = await vi.importActual("react");
+  const { useSearch: useSearchCtx } = await import("../context/SearchContext");
+  return { default: function MockSearchBar() {
     const { setSearchParams, applySearch } = useSearchCtx();
     return React.createElement(
       "div",
@@ -49,7 +48,7 @@ jest.mock("../components/SearchBar", () => {
       ),
       React.createElement("button", { type: "button", onClick: applySearch }, "apply")
     );
-  };
+  } };
 });
 
 const AppliedProbe = () => {

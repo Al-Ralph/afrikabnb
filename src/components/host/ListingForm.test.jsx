@@ -4,18 +4,18 @@ import ListingForm, { validateListing } from "./ListingForm";
 import { LanguageProvider } from "../../context/LanguageContext";
 import { api } from "../../api/client";
 
-jest.mock("../../api/client", () => {
-  const actual = jest.requireActual("../../api/client");
-  return { ...actual, api: { createListing: jest.fn(), updateListing: jest.fn(), geocode: jest.fn() } };
+vi.mock("../../api/client", async () => {
+  const actual = await vi.importActual("../../api/client");
+  return { ...actual, api: { createListing: vi.fn(), updateListing: vi.fn(), geocode: vi.fn() } };
 });
 
 // Pas de Google Maps : saisie manuelle des coordonnées.
-jest.mock("../../hooks/useGoogleMapsScript", () => ({
+vi.mock("../../hooks/useGoogleMapsScript", () => ({
   useGoogleMapsScript: () => ({ loaded: false, error: null, hasKey: false }),
 }));
 
 const renderForm = (props = {}) => {
-  const handlers = { onSaved: jest.fn(), onCancel: jest.fn() };
+  const handlers = { onSaved: vi.fn(), onCancel: vi.fn() };
   render(
     <LanguageProvider>
       <ListingForm {...handlers} {...props} />

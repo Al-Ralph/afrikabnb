@@ -1,0 +1,36 @@
+name: Frontend
+
+on:
+  push:
+    paths-ignore:
+      - "backend/**"
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "backend/**"
+      - "**.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, tests et build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Audit des dépendances de production
+        run: npm audit --omit=dev --audit-level=high

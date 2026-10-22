@@ -11,7 +11,7 @@ beforeEach(() => {
 
 describe("LanguageContext", () => {
   test("throws when useLanguage is used outside the provider", () => {
-    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useLanguage())).toThrow(/LanguageProvider/);
     spy.mockRestore();
   });
@@ -29,14 +29,14 @@ describe("LanguageContext", () => {
   });
 
   test("falls back to the browser language when supported", () => {
-    const spy = jest.spyOn(window.navigator, "language", "get").mockReturnValue("es-ES");
+    const spy = vi.spyOn(window.navigator, "language", "get").mockReturnValue("es-ES");
     const { result } = renderHook(() => useLanguage(), { wrapper });
     expect(result.current.language).toBe("es");
     spy.mockRestore();
   });
 
   test("falls back to fr when the browser language is unsupported", () => {
-    const spy = jest.spyOn(window.navigator, "language", "get").mockReturnValue("ja-JP");
+    const spy = vi.spyOn(window.navigator, "language", "get").mockReturnValue("ja-JP");
     const { result } = renderHook(() => useLanguage(), { wrapper });
     expect(result.current.language).toBe("fr");
     spy.mockRestore();

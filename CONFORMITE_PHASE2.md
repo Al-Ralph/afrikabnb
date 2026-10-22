@@ -58,7 +58,7 @@ Cas : marketplace location **démo**, auto-entrepreneur solo (CA ≈ 0), pas d�
 | Service | Où dans le code | Condition |
 |---------|-----------------|-----------|
 | Google Fonts | `ConsentContext.js` (injecté dynamiquement) | Consentement « accepté » |
-| Google Maps JS API | `useGoogleMapsScript.js` | Consentement + `REACT_APP_GOOGLE_MAPS_API_KEY` |
+| Google Maps JS API | `useGoogleMapsScript.js` | Consentement + `VITE_GOOGLE_MAPS_API_KEY` |
 | Nominatim OSM | `backend/src/api/maps/maps.controller.js` | Appels API backend |
 | Unsplash (images) | `src/data/listings.js`, seed Prisma | Chargement `<img>` (pas un script) |
 | reportWebVitals | `src/index.js` | Mesures perf locales CRA — **pas** d’endpoint analytics branché |
