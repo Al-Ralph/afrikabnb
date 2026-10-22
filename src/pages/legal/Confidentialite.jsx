@@ -77,11 +77,11 @@ const Confidentialite = () => (
                   <td>Conservé en base jusqu’à suppression de l’annonce ou du compte</td>
                 </tr>
                 <tr>
-                  <td>Session JWT</td>
-                  <td>Jeton d’authentification</td>
-                  <td>Maintenir la connexion</td>
+                  <td>Session</td>
+                  <td>Jeton d’accès (JWT) ; jeton de renouvellement aléatoire, dont seule l’empreinte SHA-256 est conservée en base avec la date de création et le navigateur (user-agent)</td>
+                  <td>Maintenir la connexion ; fermer les sessions (déconnexion, « tous les appareils », changement de mot de passe)</td>
                   <td>Intérêt légitime / exécution du contrat</td>
-                  <td>localStorage navigateur ; JWT expire après 1 jour (par défaut)</td>
+                  <td>Jeton d’accès en mémoire uniquement, 15 minutes (plus rien dans le localStorage) ; cookie httpOnly afrikabnb_rt, 30 jours, supprimé à la déconnexion ; empreintes expirées purgées à la connexion suivante, toutes supprimées avec le compte</td>
                 </tr>
                 <tr>
                   <td>Préférence de langue</td>

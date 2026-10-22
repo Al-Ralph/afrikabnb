@@ -3,6 +3,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import ProfileInfoForm from "../components/profile/ProfileInfoForm";
 import PasswordForm from "../components/profile/PasswordForm";
+import SessionsCard from "../components/profile/SessionsCard";
 import MyBookings from "../components/profile/MyBookings";
 import Footer from "../components/Footer";
 import EmptyState from "../components/EmptyState";
@@ -37,6 +38,7 @@ const Profile = () => {
         {/* key : réinitialise le formulaire si un autre compte se connecte. */}
         <ProfileInfoForm key={user.id} />
         <PasswordForm key={`pw-${user.id}`} />
+        <SessionsCard key={`ss-${user.id}`} />
         <MyBookings key={`bk-${user.id}`} />
       </div>
     );

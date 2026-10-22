@@ -1,16 +1,26 @@
 import bcrypt from "bcryptjs";
 import prisma from "../../config/db.js";
-import { signToken } from "../../config/jwt.js";
 import { httpError } from "../../utils/httpError.js";
 import { checkResetToken, generateResetToken, hashResetToken } from "../../utils/resetToken.js";
 import { appLink, sendEmailInBackground } from "../../services/email/index.js";
 import { passwordResetEmail } from "../../services/email/templates.js";
+import { signToken } from "../../config/jwt.js";
+import { readRefreshCookie, hashRefreshToken } from "../../utils/refreshToken.js";
+import {
+  clearRefreshCookie,
+  publicUserSelect,
+  requestUserAgent,
+  revokeAllForUser,
+  rotateRefreshToken,
+  setRefreshCookie,
+  startSession,
+} from "./session.js";
 
 export const SALT_ROUNDS = 12;
 // Hash factice : compare() prend le même temps que l'utilisateur existe ou non (anti-timing).
 const DUMMY_HASH = bcrypt.hashSync("afrikabnb-timing-dummy", SALT_ROUNDS);
 
-const publicUser = { id: true, email: true, name: true, avatar: true, role: true };
+const publicUser = publicUserSelect;
 
 export async function register(req, res, next) {
   try {
@@ -24,7 +34,7 @@ export async function register(req, res, next) {
       data: { email, password: hashed, name: name || null },
       select: publicUser,
     });
-    const token = signToken(user.id);
+    const token = await startSession(req, res, user.id);
     res.status(201).json({ user, token });
   } catch (err) {
     next(err);
@@ -39,9 +49,9 @@ export async function login(req, res, next) {
     if (!user || !valid) {
       return res.status(401).json({ error: "Email ou mot de passe incorrect" });
     }
-    const token = signToken(user.id);
-    const { password: _, ...safe } = user;
-    res.json({ user: safe, token });
+    const token = await startSession(req, res, user.id);
+    const { id, name, avatar, role } = user;
+    res.json({ user: { id, email: user.email, name, avatar, role }, token });
   } catch (err) {
     next(err);
   }
@@ -110,9 +120,66 @@ export async function resetPassword(req, res, next) {
         where: { userId: record.userId, usedAt: null },
         data: { usedAt: now },
       });
+      // Toutes les sessions (jetons de renouvellement) de l'utilisateur sont fermées.
+      await revokeAllForUser(tx, record.userId, now);
       req.log.info({ userId: record.userId }, "[auth] mot de passe réinitialisé");
     });
     res.json({ message: "Mot de passe modifié. Vous pouvez vous connecter." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const REFRESH_ERRORS = {
+  missing: "Session absente, reconnectez-vous",
+  reused: "Session révoquée, reconnectez-vous",
+  default: "Session expirée, reconnectez-vous",
+};
+
+// POST /api/auth/refresh : rotation du jeton de renouvellement (cookie), nouveau jeton d'accès.
+export async function refresh(req, res, next) {
+  try {
+    const raw = readRefreshCookie(req);
+    if (!raw) return res.status(401).json({ error: REFRESH_ERRORS.missing });
+    const result = await rotateRefreshToken(prisma, raw, { userAgent: requestUserAgent(req) });
+    if (!result.ok) {
+      clearRefreshCookie(res);
+      if (result.reason === "reused") {
+        req.log.warn({ userId: result.userId }, "[auth] réutilisation d'un jeton de renouvellement : famille révoquée");
+      }
+      return res.status(401).json({ error: REFRESH_ERRORS[result.reason] || REFRESH_ERRORS.default });
+    }
+    setRefreshCookie(res, result.token);
+    res.json({ token: signToken(result.user.id), user: result.user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/auth/logout : révoque le jeton du cookie (s'il existe), efface le cookie. Toujours 204.
+export async function logout(req, res) {
+  const raw = readRefreshCookie(req);
+  if (raw) {
+    try {
+      await prisma.refreshToken.updateMany({
+        where: { tokenHash: hashRefreshToken(raw), revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    } catch (err) {
+      req.log.error({ err }, "[auth] déconnexion : révocation impossible");
+    }
+  }
+  clearRefreshCookie(res);
+  res.status(204).end();
+}
+
+// POST /api/auth/logout-all (auth) : révoque toutes les sessions de l'utilisateur.
+export async function logoutAll(req, res, next) {
+  try {
+    await revokeAllForUser(prisma, req.user.id);
+    req.log.info({ userId: req.user.id }, "[auth] déconnexion de tous les appareils");
+    clearRefreshCookie(res);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

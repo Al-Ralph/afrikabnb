@@ -7,11 +7,13 @@ import { AuthProvider } from './context/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { SearchProvider } from './context/SearchContext';
 import { ConsentProvider } from './context/ConsentContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <LanguageProvider>
+      <CurrencyProvider>
       <ConsentProvider>
         <AuthProvider>
           <FavoritesProvider>
@@ -21,6 +23,7 @@ root.render(
           </FavoritesProvider>
         </AuthProvider>
       </ConsentProvider>
+      </CurrencyProvider>
     </LanguageProvider>
   </React.StrictMode>
 );

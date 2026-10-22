@@ -102,6 +102,14 @@ export const travelerTranslations = {
       admin: "Administration",
       hostDashboard: "Tableau de bord hôte",
     },
+    sessions: {
+      title: "Appareils connectés",
+      text: "Votre session reste ouverte 30 jours sur chaque appareil où vous vous êtes connecté. En cas de doute (appareil perdu, ordinateur partagé), fermez-les toutes.",
+      logoutAll: "Se déconnecter de tous les appareils",
+      confirm: "Se déconnecter de tous les appareils, y compris celui-ci ?",
+      pending: "Déconnexion…",
+      error: "Impossible de fermer les sessions pour le moment. Réessayez.",
+    },
     amenities: {
       WIFI: "Wi-Fi",
       AIR_CONDITIONING: "Climatisation",
@@ -228,6 +236,14 @@ export const travelerTranslations = {
     menu: {
       admin: "Administration",
       hostDashboard: "Host dashboard",
+    },
+    sessions: {
+      title: "Signed-in devices",
+      text: "You stay signed in for 30 days on every device you have logged in from. If in doubt (lost device, shared computer), sign out of all of them.",
+      logoutAll: "Sign out of all devices",
+      confirm: "Sign out of all devices, including this one?",
+      pending: "Signing out…",
+      error: "Unable to close your sessions right now. Please try again.",
     },
     amenities: {
       WIFI: "Wi-Fi",
@@ -356,6 +372,14 @@ export const travelerTranslations = {
       admin: "Administración",
       hostDashboard: "Panel del anfitrión",
     },
+    sessions: {
+      title: "Dispositivos conectados",
+      text: "Tu sesión permanece abierta 30 días en cada dispositivo donde hayas iniciado sesión. Si tienes dudas (dispositivo perdido, ordenador compartido), ciérralas todas.",
+      logoutAll: "Cerrar sesión en todos los dispositivos",
+      confirm: "¿Cerrar sesión en todos los dispositivos, incluido este?",
+      pending: "Cerrando sesión…",
+      error: "No se pueden cerrar las sesiones en este momento. Inténtalo de nuevo.",
+    },
     amenities: {
       WIFI: "Wi-Fi",
       AIR_CONDITIONING: "Aire acondicionado",
@@ -483,6 +507,14 @@ export const travelerTranslations = {
       admin: "Verwaltung",
       hostDashboard: "Gastgeber-Dashboard",
     },
+    sessions: {
+      title: "Angemeldete Geräte",
+      text: "Ihre Sitzung bleibt auf jedem Gerät, auf dem Sie sich angemeldet haben, 30 Tage lang aktiv. Im Zweifel (verlorenes Gerät, geteilter Computer) melden Sie sich überall ab.",
+      logoutAll: "Von allen Geräten abmelden",
+      confirm: "Von allen Geräten abmelden, einschließlich diesem?",
+      pending: "Abmeldung…",
+      error: "Die Sitzungen können gerade nicht beendet werden. Bitte erneut versuchen.",
+    },
     amenities: {
       WIFI: "WLAN",
       AIR_CONDITIONING: "Klimaanlage",
@@ -609,6 +641,14 @@ export const travelerTranslations = {
     menu: {
       admin: "Administração",
       hostDashboard: "Painel do anfitrião",
+    },
+    sessions: {
+      title: "Dispositivos conectados",
+      text: "A sua sessão permanece aberta durante 30 dias em cada dispositivo onde iniciou sessão. Em caso de dúvida (dispositivo perdido, computador partilhado), termine todas.",
+      logoutAll: "Terminar sessão em todos os dispositivos",
+      confirm: "Terminar sessão em todos os dispositivos, incluindo este?",
+      pending: "A terminar sessão…",
+      error: "Não é possível terminar as sessões neste momento. Tente novamente.",
     },
     amenities: {
       WIFI: "Wi-Fi",

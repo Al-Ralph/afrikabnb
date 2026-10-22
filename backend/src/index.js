@@ -21,7 +21,9 @@ app.set("trust proxy", config.trustProxy);
 
 app.use(httpLogger);
 app.use(helmet());
-app.use(cors({ origin: config.corsOrigins }));
+// credentials : cookie de session (afrikabnb_rt) ; origines explicites uniquement (jamais "*",
+// refusé par src/config/env.js).
+app.use(cors({ origin: config.corsOrigins, credentials: true, exposedHeaders: ["WWW-Authenticate"] }));
 
 const limiter = (windowMs, limit) =>
   rateLimit({
@@ -41,6 +43,8 @@ app.use(["/api/maps/geocode", "/api/maps/reverse"], limiter(60 * 1000, 30));
 // Mot de passe oublié : limite stricte (envoi d'emails, anti-énumération / anti-spam).
 app.use("/api/auth/forgot-password", limiter(15 * 60 * 1000, 5));
 app.use("/api/auth/reset-password", limiter(15 * 60 * 1000, 10));
+// Renouvellement de session : un appel par chargement de page / expiration du jeton d'accès.
+app.use("/api/auth/refresh", limiter(15 * 60 * 1000, 60));
 // Téléversement de photos (traitement sharp coûteux).
 app.use("/api/listings/:id/images", (req, res, next) => (req.method === "POST" ? uploadLimiter(req, res, next) : next()));
 
