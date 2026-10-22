@@ -46,7 +46,7 @@ const reactAppRules = {
 };
 
 export default [
-  { ignores: ["build/**", "coverage/**"] },
+  { ignores: ["build/**", "coverage/**", "playwright-report/**", "test-results/**", "blob-report/**"] },
   {
     files: ["src/**/*.{js,jsx}"],
     languageOptions: {
@@ -71,6 +71,21 @@ export default [
     files: ["src/**/*.test.{js,jsx}", "src/setupTests.js"],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node, ...globals.vitest },
+    },
+  },
+  {
+    // Tests de bout en bout Playwright (Node ; les callbacks de page.evaluate s'exécutent dans le navigateur).
+    files: ["e2e/**/*.js", "playwright.config.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      "no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
+      // Les fixtures Playwright sans dépendance s'écrivent `async ({}, use) => …`.
+      "no-empty-pattern": "off",
     },
   },
 ];
