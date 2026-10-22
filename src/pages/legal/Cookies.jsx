@@ -62,6 +62,20 @@ const Cookies = () => {
                     <td>Exempt (préférence utilisateur)</td>
                   </tr>
                   <tr>
+                    <td>afrikabnb_currency</td>
+                    <td>Stockage local</td>
+                    <td>Mémoriser la devise d’affichage choisie (absent en mode automatique)</td>
+                    <td>Jusqu’à suppression ou retour au mode automatique</td>
+                    <td>Exempt (préférence utilisateur)</td>
+                  </tr>
+                  <tr>
+                    <td>afrikabnb_rates</td>
+                    <td>Stockage de session</td>
+                    <td>Garder les taux de change publics pour éviter de les recharger (aucune donnée personnelle)</td>
+                    <td>6 heures, effacé à la fermeture de l’onglet</td>
+                    <td>Exempt (fonctionnement du service)</td>
+                  </tr>
+                  <tr>
                     <td>afrikabnb_consent</td>
                     <td>Stockage local</td>
                     <td>Mémoriser le choix cookies</td>

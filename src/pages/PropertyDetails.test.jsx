@@ -14,6 +14,7 @@ vi.mock(
     return {
       Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children),
       useParams: () => ({ id: mockId }),
+      useNavigate: () => vi.fn(),
     };
   }
 );

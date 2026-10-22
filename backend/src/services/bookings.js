@@ -4,6 +4,12 @@ import { Prisma } from "@prisma/client";
 import prisma from "../config/db.js";
 import { listingBaseInclude } from "../api/listings/listings.serializers.js";
 import { httpError } from "../utils/httpError.js";
+import {
+  generateGuestAccessToken,
+  hashGuestAccessToken,
+  isGuestAccessTokenFormat,
+  isGuestAccessValid,
+} from "../utils/guestAccess.js";
 import { MAX_AMOUNT, addDays, computeTotalPrice, formatDay, nightsBetween, parseDay, todayDay } from "../utils/booking.js";
 import {
   MAX_PENDING_PER_GUEST,
@@ -23,7 +29,8 @@ export const guestBookingInclude = {
   review: { select: { id: true } },
 };
 
-// Vue hôte : voyageur (sans email) + résumé de l'annonce.
+// Vue hôte : voyageur (sans e-mail de compte) + résumé de l'annonce. La fiche de contact (colonnes
+// scalaires) n'est exposée que par la sérialisation hôte (bookingWithContactToJson).
 export const hostBookingInclude = {
   guest: publicPerson,
   listing: {
@@ -51,12 +58,31 @@ async function overlapping(tx, listingId, start, end) {
   return { bookings, blockedPeriods };
 }
 
-// Réservation instantanée (instantBook) -> CONFIRMED ; sinon demande PENDING à valider par l'hôte.
-// Retourne la réservation créée (include guestBookingInclude).
-export async function createBooking({ listingId, user, checkIn, checkOut, guests }, db = prisma) {
+// Colonnes de la fiche de contact à partir du contact validé (contactSchema).
+export function contactData(contact) {
+  return {
+    contactName: contact.name,
+    contactEmail: contact.email.toLowerCase(),
+    contactPhone: contact.phone,
+    contactCountry: contact.country.toUpperCase(),
+    arrivalTime: contact.arrivalTime ?? null,
+    messageToHost: contact.message ?? null,
+  };
+}
+
+// Création d'une réservation, connectée (`user` = { id }) ou sans compte (`user` null).
+// - Connecté : réservation instantanée (instantBook) -> CONFIRMED ; sinon demande PENDING à valider
+//   par l'hôte (quota de demandes en attente par compte).
+// - Sans compte : toujours PENDING, même si instantBook (un inconnu ne bloque pas un calendrier sans
+//   contrôle de l'hôte) ; quota de demandes en attente par adresse e-mail (verrou consultatif) ;
+//   jeton d'accès généré (seul son hash est stocké).
+// Retourne { booking (include guestBookingInclude), accessToken (sans compte uniquement, sinon null) }.
+export async function createBooking({ listingId, user, checkIn, checkOut, guests, contact }, db = prisma) {
   const nights = nightsBetween(checkIn, checkOut);
   const start = parseDay(checkIn);
   const end = parseDay(checkOut);
+  const anonymous = !user;
+  const fields = contactData(contact);
 
   return db.$transaction(async (tx) => {
     // Verrou de la ligne Listing : deux réservations concurrentes de la même annonce sont
@@ -66,19 +92,34 @@ export async function createBooking({ listingId, user, checkIn, checkOut, guests
       FROM "Listing" WHERE "id" = ${listingId} FOR UPDATE`;
     const listing = rows[0];
     if (!listing || listing.status !== "ACTIVE") throw httpError(404, "Annonce introuvable");
-    if (listing.hostId === user.id) {
+    if (!anonymous && listing.hostId === user.id) {
       throw httpError(403, "Impossible de réserver sa propre annonce");
     }
     if (guests > Number(listing.maxGuests)) {
       throw httpError(400, `Capacité maximale dépassée (${listing.maxGuests} voyageurs)`);
     }
-    if (!listing.instantBook) {
+    const status = !anonymous && listing.instantBook ? "CONFIRMED" : "PENDING";
+    if (status === "PENDING") {
       if (nights > MAX_REQUEST_NIGHTS) {
-        throw httpError(400, `Une demande est limitée à ${MAX_REQUEST_NIGHTS} nuits (réservation instantanée non disponible pour cette annonce)`);
+        throw httpError(
+          400,
+          anonymous
+            ? `Une demande est limitée à ${MAX_REQUEST_NIGHTS} nuits`
+            : `Une demande est limitée à ${MAX_REQUEST_NIGHTS} nuits (réservation instantanée non disponible pour cette annonce)`
+        );
       }
-      // Verrou du voyageur : deux demandes simultanées ne peuvent pas dépasser le quota.
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
-      const pending = await tx.booking.count({ where: { guestId: user.id, ...activePendingWhere() } });
+      let pending;
+      if (anonymous) {
+        // Verrou consultatif (libéré en fin de transaction) sur l'adresse : deux demandes simultanées
+        // de la même adresse ne dépassent pas le quota. $executeRaw : pg_advisory_xact_lock renvoie void.
+        const lockKey = `booking-contact:${fields.contactEmail}`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+        pending = await tx.booking.count({ where: { contactEmail: fields.contactEmail, ...activePendingWhere() } });
+      } else {
+        // Verrou du voyageur : deux demandes simultanées ne peuvent pas dépasser le quota.
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
+        pending = await tx.booking.count({ where: { guestId: user.id, ...activePendingWhere() } });
+      }
       if (pending >= MAX_PENDING_PER_GUEST) {
         throw httpError(429, "Trop de demandes en attente : attendez la réponse des hôtes");
       }
@@ -91,18 +132,23 @@ export async function createBooking({ listingId, user, checkIn, checkOut, guests
       throw httpError(409, "Ces dates ne sont pas disponibles");
     }
 
-    return tx.booking.create({
+    const access = anonymous ? generateGuestAccessToken(checkOut) : null;
+    const booking = await tx.booking.create({
       data: {
         listingId,
-        guestId: user.id,
+        guestId: anonymous ? null : user.id,
         checkIn: start,
         checkOut: end,
         guests,
         totalPrice: new Prisma.Decimal(totalPrice.toFixed(2)),
-        status: listing.instantBook ? "CONFIRMED" : "PENDING",
+        status,
+        ...fields,
+        guestAccessTokenHash: access?.tokenHash ?? null,
+        guestAccessExpiresAt: access?.expiresAt ?? null,
       },
       include: guestBookingInclude,
     });
+    return { booking, accessToken: access?.token ?? null };
   });
 }
 
@@ -148,7 +194,8 @@ export async function getAvailability({ listingId, from, to }, db = prisma) {
 }
 
 // Applique une transition (cancel / confirm / decline) dans une transaction.
-// allowed(booking, user) -> message d'erreur 403 ou null.
+// allowed(booking, user) -> message d'erreur 403 ou null. `user` null : voyageur sans compte,
+// authentifié par son jeton d'accès (voir cancelGuestBooking).
 // Retourne { booking (rechargée pour la réponse), changed, by: "guest" | "host" }.
 async function transition(bookingId, user, action, allowed, db) {
   const outcome = await db.$transaction(async (tx) => {
@@ -173,7 +220,8 @@ async function transition(bookingId, user, action, allowed, db) {
       }
       return { error: result };
     }
-    if (result.unchanged) return { booking, changed: false, by: found.guestId === user.id ? "guest" : "host" };
+    const by = !user || (found.guestId != null && found.guestId === user.id) ? "guest" : "host";
+    if (result.unchanged) return { booking, changed: false, by };
     if (result.status === "CONFIRMED") {
       // Garde-fou : les dates d'une demande PENDING sont déjà réservées, sauf incohérence.
       const candidates = await overlapping(tx, booking.listingId, booking.checkIn, booking.checkOut);
@@ -182,7 +230,7 @@ async function transition(bookingId, user, action, allowed, db) {
       }
     }
     await tx.booking.update({ where: { id: booking.id }, data: { status: result.status } });
-    return { booking, changed: true, by: found.guestId === user.id ? "guest" : "host" };
+    return { booking, changed: true, by };
   });
   // Erreur métier levée après le commit (persistance éventuelle de EXPIRED conservée).
   if (outcome.error) throw httpError(outcome.error.code, outcome.error.error);
@@ -201,9 +249,36 @@ export function cancelBooking({ bookingId, user }, db = prisma) {
     bookingId,
     user,
     "cancel",
-    (b, u) => (b.guestId !== u.id && b.listing.hostId !== u.id ? "Non autorisé à annuler cette réservation" : null),
+    (b, u) =>
+      (b.guestId == null || b.guestId !== u.id) && b.listing.hostId !== u.id
+        ? "Non autorisé à annuler cette réservation"
+        : null,
     db
   );
+}
+
+// Réservation sans compte retrouvée par l'empreinte de son jeton d'accès. Jeton mal formé, inconnu
+// ou expiré : 404 générique (aucune information sur l'existence de la réservation).
+async function findByGuestToken(token, include, db) {
+  const notFound = () => httpError(404, "Réservation introuvable");
+  if (!isGuestAccessTokenFormat(token)) throw notFound();
+  const booking = await db.booking.findUnique({
+    where: { guestAccessTokenHash: hashGuestAccessToken(token) },
+    ...(include ? { include } : {}),
+  });
+  if (!booking || !isGuestAccessValid(booking)) throw notFound();
+  return booking;
+}
+
+// Vue du voyageur sans compte : réservation + annonce publique (hôte sans e-mail).
+export function getGuestBooking({ token }, db = prisma) {
+  return findByGuestToken(token, { listing: { include: listingBaseInclude } }, db);
+}
+
+// Annulation par le voyageur sans compte : mêmes règles que pour un voyageur connecté.
+export async function cancelGuestBooking({ token }, db = prisma) {
+  const found = await findByGuestToken(token, null, db);
+  return transition(found.id, null, "cancel", () => null, db);
 }
 
 // L'hôte accepte une demande PENDING (non expirée).

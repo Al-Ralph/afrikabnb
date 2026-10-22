@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
-import { logger } from "../config/logger.js";
+import { logger, maskSensitiveUrl } from "../config/logger.js";
 
 export const errorHandler = (err, req, res, next) => {
   if (res.headersSent) return next(err);
@@ -38,7 +38,7 @@ export const errorHandler = (err, req, res, next) => {
 
   if (status >= 500) {
     // req.log (pino-http) porte déjà l'id de requête ; repli sur le logger racine hors requête HTTP.
-    (req.log || logger).error({ err, reqId: req.id }, `${req.method} ${req.originalUrl} : erreur serveur`);
+    (req.log || logger).error({ err, reqId: req.id }, `${req.method} ${maskSensitiveUrl(req.originalUrl)} : erreur serveur`);
     return res.status(status).json({ error: "Erreur serveur", requestId: req.id });
   }
   res.status(status).json({ error: message || "Requête invalide" });

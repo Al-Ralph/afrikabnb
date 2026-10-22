@@ -1,7 +1,7 @@
 import * as listingsService from "../../services/listings.js";
 import { listHostBookings } from "../../services/bookings.js";
 import { listingToJson } from "./listings.serializers.js";
-import { bookingToJson } from "../bookings/bookings.serializers.js";
+import { bookingWithContactToJson } from "../bookings/bookings.serializers.js";
 
 export async function list(req, res, next) {
   try {
@@ -40,11 +40,12 @@ export async function mine(req, res, next) {
   }
 }
 
-// Réservations reçues sur les annonces de l'utilisateur connecté.
+// Réservations reçues sur les annonces de l'utilisateur connecté, avec la fiche de contact du
+// voyageur (hôte de l'annonce uniquement : filtre listing.hostId du service).
 export async function mineBookings(req, res, next) {
   try {
     const bookings = await listHostBookings(req.user.id);
-    res.json({ data: bookings.map((b) => bookingToJson(b)) });
+    res.json({ data: bookings.map((b) => bookingWithContactToJson(b)) });
   } catch (err) {
     next(err);
   }
@@ -54,7 +55,7 @@ export async function mineBookings(req, res, next) {
 export async function mineStats(req, res, next) {
   try {
     const { upcoming, ...stats } = await listingsService.getHostStats(req.user.id);
-    res.json({ ...stats, upcomingArrivals: upcoming.map((b) => bookingToJson(b)) });
+    res.json({ ...stats, upcomingArrivals: upcoming.map((b) => bookingWithContactToJson(b)) });
   } catch (err) {
     next(err);
   }
