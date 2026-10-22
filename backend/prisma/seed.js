@@ -28,6 +28,15 @@ const users = [
   { key: "kofi", email: "kofi@afrikabnb.com", name: "Kofi Mensah", role: "GUEST" },
 ];
 
+// Le compte ADMIN n'utilise jamais le mot de passe de démo (publié dans le README) :
+// il n'est créé que si SEED_ADMIN_PASSWORD (12 caractères minimum) est défini dans .env.
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@afrikabnb.com";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
+if (ADMIN_PASSWORD && ADMIN_PASSWORD.length < 12) {
+  console.error("Seed refusé : SEED_ADMIN_PASSWORD doit contenir au moins 12 caractères.");
+  process.exit(1);
+}
+
 const img = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80`;
 
 // Prix en francs CFA (XOF). Au moins 2 annonces par catégorie du front.
@@ -61,6 +70,64 @@ const listings = [
   // luxe
   { id: "seed-marrakech-palace", host: "awa", categoryId: "luxe", title: "Palais dans la Palmeraie", location: "Palmeraie, Marrakech, Morocco", latitude: 31.67, longitude: -7.97, pricePerNight: 450000, maxGuests: 10, bedrooms: 5, acceptsPets: false, imageUrl: img("1580587771525-78b9dba3b914"), description: "Palais privé avec hammam, piscine chauffée et personnel dédié." },
   { id: "seed-lagos-ikoyi-villa", host: "demo", categoryId: "luxe", title: "Villa de prestige à Ikoyi", location: "Ikoyi, Lagos, Nigeria", latitude: 6.4541, longitude: 3.4347, pricePerNight: 380000, maxGuests: 8, bedrooms: 4, acceptsPets: false, imageUrl: img("1512917774080-9991f1c4c750"), description: "Villa contemporaine sécurisée avec piscine et cinéma privé." },
+];
+
+// Équipements par annonce (enum Amenity) ; instantBook: false = réservation sur demande.
+const extras = {
+  "seed-cape-town-villa": { amenities: ["WIFI", "POOL", "SEA_VIEW", "PARKING", "KITCHEN", "WASHER", "TV", "AIR_CONDITIONING", "TERRACE", "BBQ"] },
+  "seed-abidjan-pool-villa": { amenities: ["WIFI", "POOL", "AIR_CONDITIONING", "GENERATOR", "WATER_TANK", "SECURITY", "GARDEN", "PARKING", "KITCHEN"] },
+  "seed-dakar-seaside-villa": { amenities: ["WIFI", "SEA_VIEW", "BEACH_ACCESS", "AIR_CONDITIONING", "KITCHEN", "TERRACE", "SECURITY"] },
+  "seed-lome-beach-house": { amenities: ["WIFI", "SEA_VIEW", "BEACH_ACCESS", "FAN", "GENERATOR", "WATER_TANK", "KITCHEN", "MOSQUITO_NETS", "SECURITY"] },
+  "seed-serengeti-eco-lodge": { amenities: ["SOLAR_POWER", "BREAKFAST", "AIRPORT_SHUTTLE", "MOSQUITO_NETS", "HOUSEKEEPING", "TERRACE"] },
+  "seed-masai-mara-camp": { amenities: ["SOLAR_POWER", "BREAKFAST", "MOSQUITO_NETS", "HOUSEKEEPING", "SECURITY"] },
+  "seed-kpalime-cabin": { amenities: ["GARDEN", "FAN", "WATER_TANK", "SOLAR_POWER", "BREAKFAST", "MOSQUITO_NETS"] },
+  "seed-drakensberg-chalet": { amenities: ["WIFI", "KITCHEN", "PARKING", "GARDEN", "BBQ", "WATER_HEATER"] },
+  "seed-marrakech-riad": { amenities: ["WIFI", "AIR_CONDITIONING", "BREAKFAST", "TERRACE", "HOUSEKEEPING", "WATER_HEATER"] },
+  "seed-nairobi-apartment": { amenities: ["WIFI", "WORKSPACE", "KITCHEN", "WASHER", "TV", "SECURITY", "CCTV", "GENERATOR"] },
+  "seed-accra-loft": { amenities: ["WIFI", "AIR_CONDITIONING", "WORKSPACE", "TV", "GENERATOR", "SECURITY"] },
+  "seed-matmata-troglodyte": { amenities: ["BREAKFAST", "PARKING", "HOUSEKEEPING"] },
+  "seed-merzouga-bubble": { amenities: ["BREAKFAST", "AIRPORT_SHUTTLE", "SOLAR_POWER"] },
+  "seed-kruger-lodge": { amenities: ["WIFI", "POOL", "BREAKFAST", "PARKING", "TERRACE", "AIR_CONDITIONING"] },
+  "seed-volcanoes-lodge": { amenities: ["WIFI", "BREAKFAST", "WATER_HEATER", "GARDEN", "AIRPORT_SHUTTLE"] },
+  "seed-zanzibar-bungalow": { amenities: ["WIFI", "SEA_VIEW", "BEACH_ACCESS", "FAN", "MOSQUITO_NETS", "BREAKFAST"] },
+  "seed-goree-house": { amenities: ["SEA_VIEW", "FAN", "KITCHEN", "TERRACE", "WATER_TANK"], instantBook: false },
+  "seed-nosy-be-villa": { amenities: ["WIFI", "POOL", "SEA_VIEW", "BEACH_ACCESS", "GENERATOR", "GARDEN", "KITCHEN"] },
+  "seed-marrakech-palace": { amenities: ["WIFI", "POOL", "AIR_CONDITIONING", "BREAKFAST", "HOUSEKEEPING", "PARKING", "GARDEN", "SECURITY", "AIRPORT_SHUTTLE"], instantBook: false },
+  "seed-lagos-ikoyi-villa": { amenities: ["WIFI", "POOL", "AIR_CONDITIONING", "GENERATOR", "WATER_TANK", "SECURITY", "CCTV", "TV", "PARKING", "WORKSPACE"], instantBook: false },
+};
+
+// Photos supplémentaires (intérieurs) : 1 à 3 par annonce après la couverture (position 0 = imageUrl).
+const interiorPhotos = [
+  "1505693416388-ac5ce068fe85",
+  "1522708323590-d24dbb6b0267",
+  "1484154218962-a197022b5858",
+  "1560448204-e02f11c3d0e2",
+  "1493809842364-78817add7ffb",
+  "1586023492125-27b2c045efd7",
+  "1600607687939-ce8a6c25118c",
+  "1600566753190-17f0baa2a6c3",
+  "1631049307264-da0ec9d70304",
+  "1540518614846-7eded433c457",
+  "1502005229762-cf1b2da7c5d6",
+  "1554995207-c18c203602cb",
+];
+
+function imagesFor(listing, index) {
+  const extraCount = 1 + (index % 3);
+  const urls = [listing.imageUrl];
+  for (let i = 0; i < extraCount; i++) urls.push(img(interiorPhotos[(index * 3 + i) % interiorPhotos.length]));
+  return urls.map((url, position) => ({
+    id: `${listing.id}-img-${position}`,
+    url,
+    position,
+    alt: `${listing.title} – photo ${position + 1}`,
+  }));
+}
+
+// Dates bloquées par l'hôte (start = décalage en jours).
+const blockedPeriods = [
+  { id: "seed-blocked-01", listing: "seed-lome-beach-house", start: 40, nights: 5, reason: "Travaux de peinture" },
+  { id: "seed-blocked-02", listing: "seed-kpalime-cabin", start: 20, nights: 7, reason: "Séjour personnel" },
 ];
 
 // Titres des annonces créées par l'ancienne version du seed (identifiants aléatoires) :
@@ -103,7 +170,13 @@ const bookings = [
   { id: "seed-booking-22", listing: "seed-cape-town-villa", guest: "kofi", start: 30, nights: 7, guests: 6 },
   { id: "seed-booking-23", listing: "seed-volcanoes-lodge", guest: "awa", start: 21, nights: 3, guests: 2 },
   { id: "seed-booking-24", listing: "seed-nosy-be-villa", guest: "kofi", start: 45, nights: 5, guests: 4, status: "CANCELLED" },
+  // Demande en attente de l'hôte (annonce sans réservation instantanée ; expire 48 h après le seed)
+  { id: "seed-booking-25", listing: "seed-goree-house", guest: "kofi", start: 10, nights: 3, guests: 2, status: "PENDING" },
+  // Demande refusée par l'hôte
+  { id: "seed-booking-26", listing: "seed-marrakech-palace", guest: "kofi", start: 25, nights: 2, guests: 4, status: "DECLINED" },
 ];
+
+const RELEASED = ["CANCELLED", "DECLINED", "EXPIRED"];
 
 async function main() {
   const hashed = await bcrypt.hash(DEMO_PASSWORD, 12);
@@ -116,6 +189,13 @@ async function main() {
     });
     userIds[u.key] = user.id;
   }
+  if (ADMIN_PASSWORD) {
+    await prisma.user.upsert({
+      where: { email: ADMIN_EMAIL },
+      update: { role: "ADMIN" },
+      create: { email: ADMIN_EMAIL, password: await bcrypt.hash(ADMIN_PASSWORD, 12), name: "Admin AfrikaBnB", role: "ADMIN" },
+    });
+  }
 
   const seededIds = listings.map((l) => l.id);
   await prisma.listing.deleteMany({
@@ -123,8 +203,15 @@ async function main() {
   });
 
   const listingById = {};
-  for (const { host, ...l } of listings) {
-    const data = { ...l, pricePerNight: new Prisma.Decimal(l.pricePerNight), currency: "XOF" };
+  for (const [index, { host, ...l }] of listings.entries()) {
+    const data = {
+      ...l,
+      pricePerNight: new Prisma.Decimal(l.pricePerNight),
+      currency: "XOF",
+      amenities: extras[l.id]?.amenities ?? [],
+      instantBook: extras[l.id]?.instantBook ?? true,
+      status: "ACTIVE",
+    };
     delete data.id;
     await prisma.listing.upsert({
       where: { id: l.id },
@@ -132,6 +219,30 @@ async function main() {
       create: { id: l.id, ...data, hostId: userIds[host] },
     });
     listingById[l.id] = { ...l, host };
+
+    // Photos : identifiants fixes. Les images externes non issues du seed (ex. reprise de
+    // imageUrl par la migration 20261022180000_vague3) sont remplacées ; les photos téléversées
+    // (path non nul) sont conservées après celles du seed.
+    const images = imagesFor(l, index);
+    await prisma.listingImage.deleteMany({
+      where: { listingId: l.id, path: null, id: { notIn: images.map((i) => i.id) } },
+    });
+    for (const image of images) {
+      await prisma.listingImage.upsert({
+        where: { id: image.id },
+        update: { url: image.url, position: image.position, alt: image.alt },
+        create: { ...image, listingId: l.id, path: null },
+      });
+    }
+    const uploaded = await prisma.listingImage.findMany({
+      where: { listingId: l.id, path: { not: null } },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+    for (const [i, u] of uploaded.entries()) {
+      await prisma.listingImage.update({ where: { id: u.id }, data: { position: images.length + i } });
+    }
+    await prisma.listing.update({ where: { id: l.id }, data: { imageUrl: images[0].url } });
   }
 
   const today = todayDay();
@@ -145,11 +256,18 @@ async function main() {
       (o) =>
         o !== b &&
         o.listing === b.listing &&
-        o.status !== "CANCELLED" &&
-        b.status !== "CANCELLED" &&
+        !RELEASED.includes(o.status) &&
+        !RELEASED.includes(b.status) &&
         rangesOverlap(checkIn, checkOut, addDays(today, o.start), addDays(today, o.start + o.nights))
     );
     if (clash) throw new Error(`${b.id} chevauche ${clash.id}`);
+    const blockedClash = blockedPeriods.find(
+      (p) =>
+        p.listing === b.listing &&
+        !RELEASED.includes(b.status) &&
+        rangesOverlap(checkIn, checkOut, addDays(today, p.start), addDays(today, p.start + p.nights))
+    );
+    if (blockedClash) throw new Error(`${b.id} chevauche ${blockedClash.id}`);
 
     const booking = await prisma.booking.upsert({
       where: { id: b.id },
@@ -182,6 +300,21 @@ async function main() {
     }
   }
 
+  for (const p of blockedPeriods) {
+    const startDate = addDays(today, p.start);
+    await prisma.blockedPeriod.upsert({
+      where: { id: p.id },
+      update: {},
+      create: {
+        id: p.id,
+        listingId: p.listing,
+        startDate: parseDay(startDate),
+        endDate: parseDay(addDays(startDate, p.nights)),
+        reason: p.reason,
+      },
+    });
+  }
+
   // Note moyenne et nombre d'avis recalculés à partir des avis réellement en base.
   for (const id of seededIds) {
     const agg = await prisma.review.aggregate({
@@ -200,7 +333,9 @@ async function main() {
 
   console.log(
     `Seed OK : ${users.length} utilisateurs (mot de passe : ${DEMO_PASSWORD}), ` +
-      `${listings.length} annonces, ${bookings.length} réservations.`
+      `${listings.length} annonces (photos et équipements), ${bookings.length} réservations, ` +
+      `${blockedPeriods.length} périodes bloquées. ` +
+      (ADMIN_PASSWORD ? `Admin : ${ADMIN_EMAIL} (mot de passe de SEED_ADMIN_PASSWORD).` : "Aucun admin (SEED_ADMIN_PASSWORD absent).")
   );
 }
 

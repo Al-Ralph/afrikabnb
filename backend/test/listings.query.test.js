@@ -1,14 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { z } from "zod";
 import {
+  AMENITIES,
   buildListingWhere,
   escapeLike,
   findListingIdsByText,
+  listingFilterFields,
+  listingOrderBy,
   searchText,
 } from "../src/api/listings/listings.query.js";
 
-test("aucun filtre : where vide", () => {
-  assert.deepEqual(buildListingWhere({}), {});
+test("aucun filtre : uniquement les annonces publiques (ACTIVE)", () => {
+  assert.deepEqual(buildListingWhere({}), { status: "ACTIVE" });
 });
 
 test("guests filtre sur maxGuests >= guests", () => {
@@ -26,15 +30,51 @@ test("texte, catégorie et animaux", () => {
   assert.equal(buildListingWhere({ pets: "0" }).acceptsPets, undefined);
 });
 
-test("checkIn/checkOut excluent les réservations non annulées qui chevauchent", () => {
-  const { bookings } = buildListingWhere({ checkIn: "2026-11-01", checkOut: "2026-11-05" });
+test("checkIn/checkOut excluent les réservations bloquantes et les dates bloquées qui chevauchent", () => {
+  const now = new Date("2026-10-22T12:00:00.000Z");
+  const { bookings, blockedPeriods } = buildListingWhere(
+    { checkIn: "2026-11-01", checkOut: "2026-11-05" },
+    { now }
+  );
   assert.deepEqual(bookings, {
     none: {
-      status: { not: "CANCELLED" },
+      OR: [
+        { status: "CONFIRMED" },
+        {
+          status: "PENDING",
+          createdAt: { gt: new Date("2026-10-20T12:00:00.000Z") },
+          checkIn: { gte: new Date("2026-10-22T00:00:00.000Z") },
+        },
+      ],
       checkIn: { lt: new Date("2026-11-05T00:00:00.000Z") },
       checkOut: { gt: new Date("2026-11-01T00:00:00.000Z") },
     },
   });
+  assert.deepEqual(blockedPeriods, {
+    none: {
+      startDate: { lt: new Date("2026-11-05T00:00:00.000Z") },
+      endDate: { gt: new Date("2026-11-01T00:00:00.000Z") },
+    },
+  });
+});
+
+test("amenities : toutes requises (hasEvery), validation de la query", () => {
+  assert.deepEqual(buildListingWhere({ amenities: ["WIFI", "POOL"] }).amenities, { hasEvery: ["WIFI", "POOL"] });
+  assert.equal(buildListingWhere({ amenities: [] }).amenities, undefined);
+  const schema = z.object(listingFilterFields);
+  assert.deepEqual(schema.parse({ amenities: "wifi, POOL,WIFI" }).amenities, ["WIFI", "POOL"]);
+  assert.equal(schema.safeParse({ amenities: "WIFI,JACUZZI_DOR" }).success, false);
+  assert.ok(AMENITIES.includes("GENERATOR") && AMENITIES.includes("WATER_TANK") && AMENITIES.includes("SECURITY"));
+});
+
+test("sort : défaut recommended, valeurs inconnues refusées, orderBy stable", () => {
+  const schema = z.object(listingFilterFields);
+  assert.equal(schema.parse({}).sort, "recommended");
+  assert.equal(schema.safeParse({ sort: "random" }).success, false);
+  assert.deepEqual(listingOrderBy("price_asc"), [{ pricePerNight: "asc" }, { id: "asc" }]);
+  assert.deepEqual(listingOrderBy("price_desc")[0], { pricePerNight: "desc" });
+  assert.deepEqual(listingOrderBy("rating_desc")[0], { rating: { sort: "desc", nulls: "last" } });
+  assert.deepEqual(listingOrderBy(), [{ createdAt: "desc" }, { id: "asc" }]);
 });
 
 test("une seule date : la nuit correspondante est vérifiée", () => {

@@ -18,6 +18,19 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       TRUST_PROXY: ${TRUST_PROXY:-0}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+      # Pile locale : photos sur un volume persistant (STORAGE_DRIVER=supabase pour Supabase Storage).
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_ALLOW_LOCAL: ${STORAGE_ALLOW_LOCAL:-1}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-listing-images}
+      EMAIL_DRIVER: ${EMAIL_DRIVER:-console}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -43,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useFavorites } from "../context/FavoritesContext";
 import { formatPrice } from "../utils/format";
-import { StarIcon } from "./Icons";
+import { interpolate } from "../utils/plural";
+import Icon, { StarIcon } from "./Icons";
 import "./PropertyCard.css";
 
 const HeartIcon = ({ filled }) => (
@@ -12,10 +13,21 @@ const HeartIcon = ({ filled }) => (
   </svg>
 );
 
-const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rating, reviewCount, image, imageUrl }) => {
+const SWIPE_MIN = 40;
+const MAX_PHOTOS = 5;
+
+const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rating, reviewCount, image, imageUrl, images }) => {
   const { t, language } = useLanguage();
   const displayPrice = price != null ? price : pricePerNight;
-  const displayImage = image || imageUrl;
+  const cover = image || imageUrl;
+  // Petit carrousel (5 photos max) si l'annonce en a plusieurs : une seule image chargée à la fois.
+  const photos = Array.isArray(images) && images.length > 1 ? images.slice(0, MAX_PHOTOS) : null;
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const touchX = useRef(null);
+  const swiped = useRef(false);
+  const displayImage = photos ? photos[photoIndex].url : cover;
+  const photoAlt =
+    photos && photoIndex > 0 ? photos[photoIndex].alt || interpolate(t("gallery.photoAlt"), { title, n: photoIndex + 1 }) : title;
   const favorites = useFavorites();
   // Hors FavoritesProvider (tests isolés) : simple état local.
   const [localFavorite, setLocalFavorite] = useState(false);
@@ -30,15 +42,46 @@ const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rat
     }
   };
 
-  // Le bouton est frère du lien (pas de bouton dans un <a>) et positionné en absolu sur l'image.
+  const showPhoto = (i) => {
+    setImageFailed(false);
+    setPhotoIndex(Math.max(0, Math.min(photos.length - 1, i)));
+  };
+
+  const swipeHandlers = photos
+    ? {
+        onTouchStart: (e) => {
+          touchX.current = e.touches[0]?.clientX ?? null;
+          swiped.current = false;
+        },
+        onTouchEnd: (e) => {
+          if (touchX.current == null) return;
+          const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
+          touchX.current = null;
+          if (Math.abs(dx) >= SWIPE_MIN) {
+            swiped.current = true;
+            showPhoto(photoIndex + (dx < 0 ? 1 : -1));
+          }
+        },
+        // Un glissement ne doit pas ouvrir la fiche.
+        onClick: (e) => {
+          if (swiped.current) {
+            e.preventDefault();
+            swiped.current = false;
+          }
+        },
+      }
+    : {};
+
+  // Les boutons sont frères du lien (pas de bouton dans un <a>) et positionnés en absolu sur l'image.
   return (
-    <div className="property-card">
-      <Link to={`/property/${id}`} className="property-card-link">
+    <div className={`property-card${photos ? " property-card--photos" : ""}`}>
+      <Link to={`/property/${id}`} className="property-card-link" {...swipeHandlers}>
         <div className="property-card-image-wrap">
           {displayImage && !imageFailed ? (
             <img
+              key={displayImage}
               src={displayImage}
-              alt={title}
+              alt={photoAlt}
               className="property-card-image"
               loading="lazy"
               decoding="async"
@@ -68,6 +111,35 @@ const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rat
           </p>
         </div>
       </Link>
+      {photos && (
+        <div className="property-card-photos">
+          {photoIndex > 0 && (
+            <button
+              type="button"
+              className="property-card-arrow property-card-arrow--prev"
+              onClick={() => showPhoto(photoIndex - 1)}
+              aria-label={t("gallery.prev")}
+            >
+              <Icon name="chevronLeft" size={16} strokeWidth={2.25} />
+            </button>
+          )}
+          {photoIndex < photos.length - 1 && (
+            <button
+              type="button"
+              className="property-card-arrow property-card-arrow--next"
+              onClick={() => showPhoto(photoIndex + 1)}
+              aria-label={t("gallery.next")}
+            >
+              <Icon name="chevronRight" size={16} strokeWidth={2.25} />
+            </button>
+          )}
+          <span className="property-card-dots" aria-hidden="true">
+            {photos.map((p, i) => (
+              <span key={p.id ?? p.url} className={i === photoIndex ? "is-active" : undefined} />
+            ))}
+          </span>
+        </div>
+      )}
       <button
         type="button"
         className={`property-card-favorite${favorite ? " property-card-favorite--active" : ""}`}

@@ -16,6 +16,8 @@ COPY --chown=node:node prisma ./prisma/
 RUN npx prisma generate
 
 COPY --chown=node:node src ./src/
+# Dossier des photos (STORAGE_DRIVER=local) appartenant à node, monté en volume par Compose.
+RUN mkdir -p uploads
 
 EXPOSE 4000
 

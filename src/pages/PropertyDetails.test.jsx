@@ -80,4 +80,47 @@ describe("PropertyDetails", () => {
     expect(api.getReviews).not.toHaveBeenCalled();
     expect(api.getAvailability).not.toHaveBeenCalled();
   });
+
+  test("API listing: photo gallery, amenities and « on request » badge", async () => {
+    mockId = "42";
+    api.getListing.mockResolvedValue({
+      id: "42",
+      title: "Villa Lagune",
+      location: "Lomé, Togo",
+      price: 45000,
+      currency: "XOF",
+      maxGuests: 4,
+      image: "https://img.test/1.jpg",
+      images: [
+        { id: "i2", url: "https://img.test/2.jpg", alt: "Terrasse", position: 1 },
+        { id: "i1", url: "https://img.test/1.jpg", alt: "Façade", position: 0 },
+      ],
+      amenities: ["WIFI", "GENERATOR"],
+      instantBook: false,
+    });
+    renderPage();
+    expect(await screen.findByText("Villa Lagune")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agrandir la photo 1 sur 2" })).toContainElement(
+      screen.getByRole("img", { name: "Façade" })
+    );
+    expect(screen.getByText("Sur demande")).toBeInTheDocument();
+    expect(screen.getByText("Groupe électrogène")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Demande de réservation" }).length).toBeGreaterThan(0);
+  });
+
+  test("instant booking badge; a listing without images falls back on its cover photo", async () => {
+    mockId = "43";
+    api.getListing.mockResolvedValue({
+      id: "43",
+      title: "Case Plage",
+      location: "Aného, Togo",
+      price: 30000,
+      currency: "XOF",
+      imageUrl: "https://img.test/cover.jpg",
+    });
+    renderPage();
+    expect(await screen.findByText("Case Plage")).toBeInTheDocument();
+    expect(screen.getByText("Réservation instantanée")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Case Plage" })).toHaveAttribute("src", "https://img.test/cover.jpg");
+  });
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
-import { useSearch, searchToQuery } from "../context/SearchContext";
+import { useSearch, searchToQuery, countActiveFilters } from "../context/SearchContext";
 import Hero from "../components/Hero";
 import SearchBar from "../components/SearchBar";
 import Categories from "../components/Categories";
@@ -9,8 +9,9 @@ import PropertyCard from "../components/PropertyCard";
 import Footer from "../components/Footer";
 import EmptyState from "../components/EmptyState";
 import { ListingGridSkeleton } from "../components/Skeleton";
+import FiltersPanel from "../components/filters/FiltersPanel";
 import { pluralize } from "../utils/plural";
-import { api, isApiUnreachable } from "../api/client";
+import { api, isApiUnreachable, LISTING_SORTS } from "../api/client";
 import { listings as mockListings } from "../data/listings";
 import "./Home.css";
 
@@ -26,17 +27,23 @@ function filterMockListings(where) {
 
 const Home = () => {
   const { t, language } = useLanguage();
-  const { appliedSearch, resetSearch } = useSearch();
+  const { appliedSearch, resetSearch, applyFilters, setSort } = useSearch();
   const [urlParams, setUrlParams] = useSearchParams();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
   const [error, setError] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Fourchette globale renvoyée par l'API (bornes des curseurs de prix).
+  const [priceRange, setPriceRange] = useState(null);
 
   // Seuls les critères envoyés à l'API déclenchent un nouveau chargement.
   const { where, categoryId } = appliedSearch;
   const hasPets = appliedSearch.pets > 0;
   const guests = appliedSearch.adults + appliedSearch.children;
+  const { minPrice, maxPrice, sort } = appliedSearch;
+  const amenitiesKey = appliedSearch.amenities.join(",");
+  const activeFilters = countActiveFilters(appliedSearch);
 
   // URL partageable : reflète la recherche appliquée.
   const queryString = searchToQuery(appliedSearch);
@@ -50,11 +57,18 @@ const Home = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    // Filtres avancés transmis seulement s'ils sont actifs.
+    const params = { where, categoryId, pets: hasPets, guests };
+    if (minPrice != null) params.minPrice = minPrice;
+    if (maxPrice != null) params.maxPrice = maxPrice;
+    if (amenitiesKey) params.amenities = amenitiesKey.split(",");
+    if (sort !== "recommended") params.sort = sort;
     api
-      .getListings({ where, categoryId, pets: hasPets, guests })
-      .then(({ data }) => {
+      .getListings(params)
+      .then(({ data, priceRange: range }) => {
         if (cancelled) return;
         setListings(data);
+        if (range?.min != null && range?.max != null) setPriceRange(range);
         setUseMock(false);
       })
       .catch((err) => {
@@ -72,7 +86,7 @@ const Home = () => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [where, categoryId, hasPets, guests]);
+  }, [where, categoryId, hasPets, guests, minPrice, maxPrice, amenitiesKey, sort]);
 
   return (
     <>
@@ -88,11 +102,36 @@ const Home = () => {
             <h2 className="home-listings-title" id="home-listings-title">
               {t("ui.home.listingsTitle")}
             </h2>
-            {!loading && !error && listings.length > 0 && (
-              <p className="home-listings-count">{pluralize(t, language, "ui.home.count", listings.length)}</p>
-            )}
+            <div className="home-listings-tools">
+              {!loading && !error && listings.length > 0 && (
+                <p className="home-listings-count" aria-live="polite">
+                  {pluralize(t, language, "ui.home.count", listings.length)}
+                </p>
+              )}
+              <label className="home-sort">
+                <span>{t("sort.label")}</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  {LISTING_SORTS.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`sort.${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
-          <Categories />
+          <Categories onOpenFilters={() => setFiltersOpen(true)} activeFilters={activeFilters} />
+          {filtersOpen && (
+            <FiltersPanel
+              applied={appliedSearch}
+              priceRange={priceRange}
+              onClose={() => setFiltersOpen(false)}
+              onApply={(filters) => {
+                applyFilters(filters);
+                setFiltersOpen(false);
+              }}
+            />
+          )}
           {!loading && useMock && (
             <p className="listings-demo-banner" role="note">{t("home.demoBanner")}</p>
           )}
@@ -129,6 +168,7 @@ const Home = () => {
                     rating={listing.rating}
                     reviewCount={listing.reviewCount}
                     image={listing.image}
+                    images={listing.images}
                   />
                 </li>
               ))}

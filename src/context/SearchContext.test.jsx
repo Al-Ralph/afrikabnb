@@ -1,6 +1,13 @@
 import React from "react";
 import { renderHook, act } from "@testing-library/react";
-import { SearchProvider, useSearch, searchToQuery, searchFromQuery, DEFAULT_APPLIED_SEARCH } from "./SearchContext";
+import {
+  SearchProvider,
+  useSearch,
+  searchToQuery,
+  searchFromQuery,
+  countActiveFilters,
+  DEFAULT_APPLIED_SEARCH,
+} from "./SearchContext";
 
 const wrapper = ({ children }) => <SearchProvider>{children}</SearchProvider>;
 
@@ -106,6 +113,32 @@ describe("search <-> URL query", () => {
     };
     const parsed = searchFromQuery(searchToQuery(applied));
     expect(parsed).toEqual(applied);
+  });
+
+  test("round-trips price, amenities and sort", () => {
+    const applied = {
+      ...DEFAULT_APPLIED_SEARCH,
+      minPrice: 20000,
+      maxPrice: 90000,
+      amenities: ["WIFI", "GENERATOR"],
+      sort: "rating_desc",
+    };
+    expect(searchToQuery(applied)).toBe("minPrice=20000&maxPrice=90000&amenities=WIFI%2CGENERATOR&sort=rating_desc");
+    expect(searchFromQuery(searchToQuery(applied))).toEqual(applied);
+  });
+
+  test("ignores unknown amenities, duplicates, unknown sorts and invalid prices", () => {
+    const parsed = searchFromQuery("amenities=WIFI,NOPE,WIFI,POOL&sort=cheapest&minPrice=-5&maxPrice=abc");
+    expect(parsed.amenities).toEqual(["WIFI", "POOL"]);
+    expect(parsed.sort).toBe("recommended");
+    expect(parsed.minPrice).toBeNull();
+    expect(parsed.maxPrice).toBeNull();
+  });
+
+  test("countActiveFilters: the price range counts once, each amenity once, sort never", () => {
+    expect(countActiveFilters(DEFAULT_APPLIED_SEARCH)).toBe(0);
+    expect(countActiveFilters({ ...DEFAULT_APPLIED_SEARCH, minPrice: 1, maxPrice: 2, sort: "price_asc" })).toBe(1);
+    expect(countActiveFilters({ ...DEFAULT_APPLIED_SEARCH, maxPrice: 2, amenities: ["WIFI", "POOL"] })).toBe(3);
   });
 
   test("ignores invalid values from the URL", () => {

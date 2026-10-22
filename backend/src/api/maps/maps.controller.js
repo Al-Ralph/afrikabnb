@@ -1,6 +1,6 @@
 import axios from "axios";
 import prisma from "../../config/db.js";
-import { buildListingWhere, findListingIdsByText, searchText } from "../listings/listings.query.js";
+import { buildListingWhere, findListingIdsByText, listingOrderBy, searchText } from "../listings/listings.query.js";
 
 const nominatim = axios.create({
   baseURL: "https://nominatim.openstreetmap.org",
@@ -78,7 +78,10 @@ export async function listingsInBounds(req, res, next) {
         imageUrl: true,
         categoryId: true,
         maxGuests: true,
+        amenities: true,
+        instantBook: true,
       },
+      orderBy: listingOrderBy(req.query.sort),
       take: 200,
     });
     const data = listings.map((l) => ({
