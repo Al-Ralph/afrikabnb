@@ -1,0 +1,62 @@
+export const listings = [
+  {
+    id: "1",
+    location: "Cape Town, South Africa",
+    title: "Luxurious Villa in Cape Town",
+    price: 450,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80",
+  },
+  {
+    id: "2",
+    location: "Marrakech, Morocco",
+    title: "Traditional Riad in Marrakech",
+    price: 120,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1540202404-a2f29016b523?w=800&q=80",
+  },
+  {
+    id: "3",
+    location: "Zanzibar, Tanzania",
+    title: "Cozy Beachfront Bungalow in Zanzibar",
+    price: 200,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80",
+  },
+  {
+    id: "4",
+    location: "Nairobi, Kenya",
+    title: "Modern Apartment in Nairobi",
+    price: 85,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80",
+  },
+  {
+    id: "5",
+    location: "Serengeti, Tanzania",
+    title: "Eco-Lodge in Serengeti",
+    price: 600,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1516426122078-c23e76319801?w=800&q=80",
+  },
+  {
+    id: "6",
+    location: "Dakar, Senegal",
+    title: "Seaside Villa in Dakar",
+    price: 300,
+    rating: 4.9,
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+  },
+];
+
+export const categories = [
+  { id: "piscines", label: "Piscines incroyables" },
+  { id: "bord-mer", label: "Bord de mer" },
+  { id: "safari", label: "Safari" },
+  { id: "cabanes", label: "Cabanes" },
+  { id: "tendance", label: "Tendance" },
+  { id: "omg", label: "OMG!" },
+  { id: "parcs", label: "Parcs nationaux" },
+  { id: "iles", label: "Îles" },
+  { id: "luxe", label: "Luxe" },
+];

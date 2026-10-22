@@ -21,3 +21,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# secrets (variables d’environnement)
+.env
+
+# état local oh-my-claudecode (sauf skills de projet)
+.omc/*
+!.omc/skills/

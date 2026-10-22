@@ -1,3 +1,11 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+
+# Pages légales indexables
+Allow: /mentions-legales
+Allow: /confidentialite
+Allow: /cookies
+Allow: /cgu
+
+Sitemap: /sitemap.xml

@@ -1,70 +1,169 @@
-# Getting Started with Create React App
+# AfrikaBnB
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. Projet étudiant / portfolio réalisé à Lomé (Togo).
 
-## Available Scripts
+- **Frontend** : React 19 (Create React App), à la racine du dépôt.
+- **Backend** : API REST Node.js / Express + Prisma + PostgreSQL (hébergé sur Supabase), dans `backend/` (documentation détaillée des endpoints : [`backend/README.md`](backend/README.md)).
 
-In the project directory, you can run:
+> Captures d’écran : non disponibles pour l’instant.
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+| Couche | Technologies |
+|---|---|
+| Frontend | React 19, react-scripts 5 (Create React App), react-router 7, Context API, CSS |
+| Backend | Node.js, Express 4 (modules ESM), Prisma 5, zod, jsonwebtoken, bcryptjs, helmet, express-rate-limit |
+| Base de données | PostgreSQL (Supabase en production ; PostgreSQL 16 en local via Docker, facultatif) |
+| Services externes | Google Maps JavaScript API / Places (optionnel, après consentement), OpenStreetMap Nominatim (géocodage côté serveur), images Unsplash |
+| Conteneurs | Image Docker de l’API ; Docker Compose : API + PostgreSQL local (le frontend n’est pas conteneurisé) |
 
-### `npm test`
+100 % JavaScript (pas de TypeScript). Le backend est un **monolithe modulaire** : une seule application Express découpée par domaine (`backend/src/api/{auth,users,listings,bookings,reviews,favorites,maps}`).
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Fonctionnalités
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **Recherche** : destination (texte recherché dans la ville et le titre), dates (exclut les logements déjà réservés), nombre de voyageurs (≤ capacité), animaux acceptés, catégories (Piscines, Bord de mer, Safari, Cabanes, Tendance, OMG!, Parcs nationaux, Îles, Luxe). Les critères sont synchronisés dans l’URL.
+- **Fiche logement** avec widget de réservation : dates déjà réservées bloquées, total calculé (nuits × prix), contrôle anti double-réservation dans une transaction côté serveur.
+- **Avis** : possibles après le séjour, un par réservation ; la note moyenne de l’annonce est calculée à partir des avis.
+- **Favoris** persistés en base.
+- **Profil** (`/profil`) : nom, avatar, changement de mot de passe (ancien mot de passe exigé), mes réservations, annulation, dépôt d’avis.
+- **Espace hôte** (`/host`) : création / modification / suppression d’annonces (devise XOF, EUR, USD…, capacité, chambres, catégorie, coordonnées), réservations reçues.
+- **Carte** (`/carte`) : Google Maps avec marqueurs de prix ; repli en liste sans clé API ou sans consentement.
+- **Multilingue** : français, anglais, espagnol, allemand, portugais.
+- **Bandeau de consentement cookies** : Google Fonts et Google Maps ne sont chargés qu’après acceptation.
+- **Pages légales** : mentions légales, confidentialité, cookies, CGU.
+- **Bandeau d’accueil statique** (CSS seul, aucune image ni bibliothèque 3D) : affichage immédiat, aucune requête tierce.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Prérequis
 
-### `npm run eject`
+- Node.js et npm
+- Un projet [Supabase](https://supabase.com) (offre gratuite suffisante), **ou** Docker (Docker Compose) pour lancer PostgreSQL et l’API en local
+- `openssl` (pour générer le secret JWT)
+- Optionnel : une clé Google Maps (Maps JavaScript API + Places API)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+---
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Installation
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### 1. Backend
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+cd backend
+npm install
+cp .env.example .env
+```
 
-## Learn More
+Éditer `backend/.env` :
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- `DATABASE_URL` : URL **Transaction pooler** Supabase (port `6543`) suivie de `?pgbouncer=true&connection_limit=1&sslmode=require` ;
+- `DIRECT_URL` : URL **Session pooler** (ou **Direct connection**) Supabase (port `5432`) suivie de `?sslmode=require` (utilisée par les migrations) ;
+- `JWT_SECRET` : coller la sortie de `openssl rand -base64 48` (32 caractères minimum ; l’API refuse de démarrer en production si le secret est absent ou faible).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Créer le schéma, générer le client Prisma, charger les données de démo et lancer l’API :
 
-### Code Splitting
+```bash
+npx prisma migrate deploy
+npx prisma generate
+npm run db:seed
+npm run dev
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+L’API écoute sur **http://localhost:4000** (`GET /health` pour vérifier). Procédure Supabase détaillée (création du projet, où trouver les URL, sauvegardes, sécurité) : [`backend/README.md`](backend/README.md#base-de-données-supabase).
 
-### Analyzing the Bundle Size
+**Avec Docker** (API + PostgreSQL local) : voir [`backend/README.md`](backend/README.md) (`docker compose up --build` depuis `backend/`, après avoir renseigné `JWT_SECRET` et `POSTGRES_PASSWORD` dans `backend/.env`).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### 2. Frontend
 
-### Making a Progressive Web App
+Dans un second terminal, à la racine du dépôt :
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```bash
+npm install
+npm start
+```
 
-### Advanced Configuration
+L’application tourne sur **http://localhost:3000**. En développement, le champ `proxy` du `package.json` redirige `/api/*` vers `http://localhost:4000` : aucune variable n’est obligatoire.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Variables optionnelles (fichier `.env` à la racine, modèle : `.env.example`) :
 
-### Deployment
+| Variable | Rôle |
+|---|---|
+| `REACT_APP_GOOGLE_MAPS_API_KEY` | Active l’autocomplétion des destinations et la carte Google. Sans clé, la page `/carte` affiche une liste. |
+| `REACT_APP_API_URL` | URL de l’API à utiliser à la place du proxy (backend sur une autre machine / un autre port). |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Si l’API est injoignable, l’accueil affiche des annonces de démonstration statiques (`src/data/listings.js`).
 
-### `npm run build` fails to minify
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Comptes de démo
+
+Créés par `npm run db:seed` (refusé si `NODE_ENV=production`). Mot de passe commun : `demo1234`.
+
+| E-mail | Rôle |
+|---|---|
+| `host@afrikabnb.com` | Hôte |
+| `awa@afrikabnb.com` | Hôte |
+| `kofi@afrikabnb.com` | Voyageur |
+
+Le seed est idempotent (relançable sans doublon) : 20 annonces réparties sur les 9 catégories, des réservations passées et à venir, et des avis.
+
+> Ces comptes et ce mot de passe sont réservés à la démo locale : ne jamais les utiliser en production.
+
+---
+
+## Tests et qualité
+
+| Commande | Où | Contenu |
+|---|---|---|
+| `npm test` | racine | Jest + Testing Library, mode watch (`CI=true npm test` pour une exécution unique) : 214 tests |
+| `npm test` | `backend/` | `node --test` : 13 tests sur la logique métier (nuits, prix, chevauchement de dates, moyenne des notes, filtres de recherche) |
+| `npm run build` | racine | Build de production dans `build/` |
+| `npm audit` | `backend/` | 0 vulnérabilité au 21/10/2026 |
+
+Taille du build (gzip) : bundle principal ≈ 123 kB, sans autre chunk significatif (la scène 3D three.js a été retirée le 22/10/2026).
+
+---
+
+## Structure du dépôt
+
+```
+afrikabnb/
+├── public/                 # index.html, robots.txt, llms.txt
+├── src/
+│   ├── api/client.js       # appels à l’API
+│   ├── components/         # UI : recherche, cartes, booking/, host/, profile/, map/, Hero (bandeau d’accueil)
+│   ├── context/            # Auth, Consent, Favorites, Language (+ translations.js), Search
+│   ├── data/listings.js    # annonces de repli (API injoignable)
+│   ├── hooks/              # useGoogleMapsScript (chargement conditionné au consentement)
+│   ├── pages/              # Home, PropertyDetails, Host, Profile, Favorites, MapPage, legal/
+│   └── utils/
+└── backend/
+    ├── src/
+    │   ├── api/            # un dossier par domaine (auth, users, listings, bookings, reviews, favorites, maps)
+    │   ├── config/         # env.js (validation de l’environnement), jwt.js, db.js
+    │   ├── middleware/     # auth, validation zod, gestion des erreurs
+    │   └── utils/
+    ├── prisma/             # schema.prisma, migrations/, seed.js
+    ├── test/               # tests node --test
+    ├── Dockerfile
+    └── docker-compose.yml
+```
+
+---
+
+## Limites connues et pistes
+
+| Limite | Piste |
+|---|---|
+| Pas de paiement en ligne | Intégrer un prestataire (mobile money, carte) |
+| Pas de messagerie hôte / voyageur | Ajouter un domaine `messages` |
+| Une seule image par annonce (URL) | Galerie et upload d’images |
+| Token JWT stocké en `localStorage` (exposé en cas de XSS) | Cookie `httpOnly` + refresh token |
+| Modes de calendrier « Mois » / « Flexibles » non implémentés (affichent « à venir ») ; l’option de flexibilité ±jours n’est pas prise en compte par la recherche | Implémenter côté API et UI |
+| Create React App est déprécié | Migration vers Vite envisagée |
+| Déploiement du frontend non décrit (pas de conteneur) | Hébergement statique du `build/` + `REACT_APP_API_URL` |
+| Index géographique : index B-tree composite `(latitude, longitude)`, pas un index `SPATIAL` | Extension PostGIS (disponible sur Supabase) si le volume l’exige |

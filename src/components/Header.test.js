@@ -1,0 +1,135 @@
+import React from "react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import Header from "./Header";
+import { LanguageProvider } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
+
+jest.mock(
+  "react-router-dom",
+  () => {
+    const React = require("react");
+    return {
+      Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children),
+      useLocation: () => ({ pathname: "/profil" }),
+    };
+  },
+  { virtual: true }
+);
+jest.mock("../context/AuthContext", () => ({ useAuth: jest.fn() }));
+jest.mock("./LanguageSelector", () => () => <div>LanguageSelector</div>);
+jest.mock("./AuthModal", () => ({ isOpen }) => (isOpen ? <div role="dialog">AuthModal</div> : null));
+
+const kofi = { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi", avatar: null };
+
+function setup(authOverrides = {}) {
+  const auth = {
+    user: null,
+    logout: jest.fn(),
+    authOpen: false,
+    openAuth: jest.fn(),
+    closeAuth: jest.fn(),
+    ...authOverrides,
+  };
+  useAuth.mockReturnValue(auth);
+  render(
+    <LanguageProvider>
+      <Header />
+    </LanguageProvider>
+  );
+  return auth;
+}
+
+const menu = () => screen.queryByRole("group", { name: "Menu du compte" });
+
+beforeEach(() => {
+  localStorage.clear();
+  localStorage.setItem("afrikabnb_lang", "fr");
+});
+
+describe("Header — connected user menu", () => {
+  test("the account button opens the menu with profile, favourites, host space, map and logout", () => {
+    setup({ user: kofi });
+    const trigger = screen.getByRole("button", { name: /Menu du compte/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(menu()).toBeNull();
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const m = within(menu());
+    expect(m.getByRole("link", { name: "Profil" })).toHaveAttribute("href", "/profil");
+    expect(m.getByRole("link", { name: "Mes favoris" })).toHaveAttribute("href", "/favoris");
+    expect(m.getByRole("link", { name: "Espace hôte" })).toHaveAttribute("href", "/host");
+    expect(m.getByRole("link", { name: "Carte" })).toHaveAttribute("href", "/carte");
+    expect(m.getByRole("button", { name: "Déconnexion" })).toBeInTheDocument();
+  });
+
+  test("Escape closes the menu and gives focus back to the trigger", () => {
+    setup({ user: kofi });
+    const trigger = screen.getByRole("button", { name: /Menu du compte/ });
+    fireEvent.click(trigger);
+    expect(menu()).not.toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(menu()).toBeNull();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
+  test("a click outside closes the menu, a click inside does not", () => {
+    setup({ user: kofi });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    fireEvent.mouseDown(within(menu()).getByRole("link", { name: "Profil" }));
+    expect(menu()).not.toBeNull();
+    fireEvent.mouseDown(document.body);
+    expect(menu()).toBeNull();
+  });
+
+  test("following a link closes the menu", () => {
+    setup({ user: kofi });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    fireEvent.click(within(menu()).getByRole("link", { name: "Mes favoris" }));
+    expect(menu()).toBeNull();
+  });
+
+  test("logout calls logout and closes the menu", () => {
+    const auth = setup({ user: kofi });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    fireEvent.click(within(menu()).getByRole("button", { name: "Déconnexion" }));
+    expect(auth.logout).toHaveBeenCalledTimes(1);
+    expect(menu()).toBeNull();
+  });
+
+  test("shows the user's name and avatar", () => {
+    setup({ user: { ...kofi, avatar: "https://img/kofi.jpg" } });
+    expect(screen.getByText("Kofi")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: /Menu du compte/ });
+    expect(within(trigger).getByRole("presentation")).toHaveAttribute("src", "https://img/kofi.jpg");
+  });
+});
+
+describe("Header — visitor", () => {
+  test("the menu button (previously inert) opens a menu with login, map and host links", () => {
+    const auth = setup();
+    const trigger = screen.getByRole("button", { name: "Menu" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const m = within(menu());
+    expect(m.getByRole("link", { name: "Carte" })).toHaveAttribute("href", "/carte");
+    expect(m.getByRole("link", { name: "Passer en mode hôte" })).toHaveAttribute("href", "/host");
+    expect(m.queryByRole("link", { name: "Profil" })).not.toBeInTheDocument();
+    fireEvent.click(m.getByRole("button", { name: "Connexion" }));
+    expect(auth.openAuth).toHaveBeenCalledTimes(1);
+    expect(menu()).toBeNull();
+  });
+
+  test("the login button opens the shared auth modal", () => {
+    const auth = setup();
+    fireEvent.click(screen.getAllByRole("button", { name: "Connexion" })[0]);
+    expect(auth.openAuth).toHaveBeenCalled();
+  });
+
+  test("renders the auth modal when authOpen is true in AuthContext", () => {
+    setup({ authOpen: true });
+    expect(screen.getByRole("dialog")).toHaveTextContent("AuthModal");
+  });
+});

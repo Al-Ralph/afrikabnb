@@ -1,0 +1,110 @@
+.categories {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0 24px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.categories-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.categories-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.category-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: color 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.category-item:hover {
+  color: var(--color-text);
+  opacity: 1;
+  border-bottom-color: var(--color-border);
+}
+
+.category-item:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.category-item--active,
+.category-item--active:hover {
+  color: var(--color-text);
+  opacity: 1;
+  border-bottom-color: var(--color-text);
+  font-weight: 600;
+}
+
+.category-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.category-svg {
+  display: block;
+}
+
+.category-label {
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .categories {
+    gap: 8px;
+  }
+
+  .category-item {
+    padding: 10px 10px 12px;
+  }
+}
+
+.categories-filters-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.categories-filters-btn:hover {
+  border-color: var(--color-text);
+  background: var(--color-bg);
+}

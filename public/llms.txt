@@ -1,0 +1,32 @@
+# AfrikaBnB
+
+> Marketplace de démonstration (démo) pour la location courte durée en Afrique.
+> Projet solo auto-entrepreneur, sans paiement en ligne ni activité commerciale opérationnelle.
+
+## Site
+
+- Accueil: /
+- Devenir hôte (placeholder): /host
+- Mentions légales: /mentions-legales
+- Confidentialité: /confidentialite
+- Cookies: /cookies
+- CGU: /cgu
+
+## Ce que le code fait
+
+- Comptes utilisateur (e-mail, mot de passe hashé, JWT en localStorage)
+- Annonces (API + données mock / images Unsplash)
+- Recherche UI en mémoire (destination, dates, voyageurs)
+- Langue (localStorage)
+- Google Fonts et Google Maps Places uniquement après consentement cookies
+- Nominatim (OpenStreetMap) côté backend si utilisé
+
+## Ce que le code ne fait pas
+
+- Paiement, newsletter, pixels pub, analytics, chat, YouTube
+- CGV de vente / réservation payante
+- Médiateur de la consommation (non applicable tant que pas de service payant)
+
+## Contact éditeur
+
+- [À COMPLÉTER]

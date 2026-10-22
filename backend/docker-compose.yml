@@ -1,0 +1,45 @@
+# Pile locale facultative : API + PostgreSQL 16. En production, la base est hébergée sur Supabase
+# (voir README : l'image de l'API se lance seule avec les URL Supabase).
+# Variables lues depuis l'environnement ou backend/.env (voir .env.example).
+# POSTGRES_PASSWORD : sans caractères @ : / ? # (inséré dans DATABASE_URL). Ex. : openssl rand -hex 24
+
+services:
+  api:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # Base locale sans pooler : la même URL sert à l'API et aux migrations.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-afrikabnb}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}@db:5432/${POSTGRES_DB:-afrikabnb}?schema=public
+      DIRECT_URL: postgresql://${POSTGRES_USER:-afrikabnb}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}@db:5432/${POSTGRES_DB:-afrikabnb}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit etre defini (openssl rand -base64 48)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-afrikabnb}
+      POSTGRES_USER: ${POSTGRES_USER:-afrikabnb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre defini}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # $$ : variables évaluées dans le conteneur (et non par Compose).
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,140 @@
+/* Styles communs aux pages compte (favoris, profil). */
+.account-page {
+  flex: 1;
+  padding: 40px 24px 64px;
+  background: var(--color-bg);
+}
+
+.account-page-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.account-page-title {
+  margin: 0 0 24px;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.account-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 56px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.account-state p {
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.account-btn:hover {
+  background: var(--color-bg);
+  text-decoration: none;
+}
+
+.account-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.account-btn-primary {
+  background: #d93a40; /* contraste >= 4.5:1 avec le texte blanc */
+  border-color: #d93a40;
+  color: #fff;
+}
+
+.account-btn-primary:hover {
+  background: #c22f35;
+  color: #fff;
+}
+
+.account-btn-danger {
+  color: #b42318;
+  border-color: #f1b4ae;
+}
+
+.account-btn:focus-visible {
+  outline: 3px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.account-alert {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.account-alert-error {
+  background: #fdecea;
+  color: #8a1c13;
+}
+
+.account-alert-success {
+  background: #e7f6ec;
+  color: #1e5e34;
+}
+
+.favorites-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 32px 24px;
+}
+
+@media (max-width: 480px) {
+  .account-page {
+    padding: 28px 16px 48px;
+  }
+
+  .favorites-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: account-spin 0.8s linear infinite;
+}
+
+@keyframes account-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-spinner {
+    animation: none;
+  }
+}
