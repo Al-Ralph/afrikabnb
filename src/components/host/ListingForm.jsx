@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useGoogleMapsScript } from "../../hooks/useGoogleMapsScript";
-import { api } from "../../api/client";
+import { api, AMENITIES } from "../../api/client";
 import { categories } from "../../data/listings";
+import { interpolate } from "../../utils/plural";
+import PhotoManager, { photosFromImages, uploadPhotoItems } from "./PhotoManager";
+import AmenitiesField from "./AmenitiesField";
 import "./ListingForm.css";
 
 export const CURRENCIES = ["XOF", "XAF", "EUR", "USD", "NGN", "GHS", "KES", "MAD", "ZAR", "EGP", "TZS"];
@@ -22,7 +25,8 @@ const toFormState = (l) => ({
   bedrooms: String(l?.bedrooms ?? 1),
   categoryId: l?.categoryId || "",
   acceptsPets: Boolean(l?.acceptsPets),
-  imageUrl: l?.imageUrl || l?.image || "",
+  amenities: Array.isArray(l?.amenities) ? l.amenities.filter((a) => AMENITIES.includes(a)) : [],
+  instantBook: l?.instantBook !== false,
 });
 
 // "12,5" ou "12.5" -> 12.5 ; "" -> null ; texte non numérique -> NaN.
@@ -35,14 +39,6 @@ const parseDecimal = (value) => {
 const parseInteger = (value) => {
   const s = String(value ?? "").trim();
   return /^\d+$/.test(s) ? Number(s) : NaN;
-};
-
-export const isHttpsUrl = (value) => {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
 };
 
 // Validation alignée sur le schéma zod du backend. Renvoie { errors, payload } ;
@@ -84,10 +80,6 @@ export function validateListing(form) {
   const bedrooms = parseInteger(form.bedrooms);
   if (!(bedrooms >= 0 && bedrooms <= 50)) errors.bedrooms = "bedroomsRange";
 
-  const imageUrl = form.imageUrl.trim();
-  if (imageUrl && !isHttpsUrl(imageUrl)) errors.imageUrl = "httpsRequired";
-  else if (imageUrl.length > MAX_TEXT) errors.imageUrl = "tooLong";
-
   const payload = {
     title,
     description,
@@ -101,20 +93,27 @@ export function validateListing(form) {
     bedrooms,
     categoryId: form.categoryId || null,
     acceptsPets: Boolean(form.acceptsPets),
-    imageUrl: imageUrl || null,
+    // imageUrl n'est plus saisi : il suit la première photo (gérée par PhotoManager).
+    amenities: (form.amenities || []).filter((a) => AMENITIES.includes(a)),
+    instantBook: form.instantBook !== false,
   };
   return { errors, payload };
 }
 
 const FIELD_ORDER = [
   "title", "description", "location", "address", "latitude", "longitude",
-  "pricePerNight", "currency", "maxGuests", "bedrooms", "categoryId", "acceptsPets", "imageUrl",
+  "pricePerNight", "currency", "maxGuests", "bedrooms", "categoryId", "acceptsPets", "amenities", "instantBook",
 ];
 
 const roundCoord = (n) => String(Math.round(n * 1e6) / 1e6);
 
+// Annonce + photos téléversées -> annonce à jour (couverture = première photo).
+const withImages = (listing, images) =>
+  images ? { ...listing, images, image: images[0]?.url ?? null, imageUrl: images[0]?.url ?? null } : listing;
+
 // Formulaire de création / modification d'annonce.
-const ListingForm = ({ listing, onSaved, onCancel }) => {
+// onDraftSaved(listing) : annonce créée mais photos en partie refusées (le formulaire reste ouvert).
+const ListingForm = ({ listing, onSaved, onCancel, onDraftSaved }) => {
   const { t } = useLanguage();
   const { loaded: placesLoaded } = useGoogleMapsScript();
   const [form, setForm] = useState(() => toFormState(listing));
@@ -122,10 +121,13 @@ const ListingForm = ({ listing, onSaved, onCancel }) => {
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [geoStatus, setGeoStatus] = useState(null);
-  const [imageBroken, setImageBroken] = useState(false);
+  // Annonce courante : devient l'annonce créée si des photos n'ont pas pu être envoyées.
+  const [current, setCurrent] = useState(listing);
+  const [photos, setPhotos] = useState(() => photosFromImages(listing?.images));
+  const [photoProgress, setPhotoProgress] = useState(null);
   const formRef = useRef(null);
   const addressRef = useRef(null);
-  const isEdit = Boolean(listing?.id);
+  const isEdit = Boolean(current?.id);
 
   const setField = (field, value) => {
     setForm((f) => ({ ...f, [field]: value }));
@@ -210,8 +212,33 @@ const ListingForm = ({ listing, onSaved, onCancel }) => {
     }
     setSubmitting(true);
     try {
-      const saved = isEdit ? await api.updateListing(listing.id, payload) : await api.createListing(payload);
-      onSaved(saved, isEdit);
+      if (isEdit) {
+        const saved = await api.updateListing(current.id, payload);
+        onSaved(saved, true);
+        return;
+      }
+      const created = await api.createListing(payload);
+      const pending = photos.filter((p) => p.status === "pending");
+      if (pending.length === 0) {
+        onSaved(created, false);
+        return;
+      }
+      // Annonce créée : envoi des photos dans l'ordre choisi (la première devient la couverture).
+      const updatePhoto = (key, patch) =>
+        setPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, ...patch } : p)));
+      const { images, failed } = await uploadPhotoItems(created.id, pending, updatePhoto, (done, total) =>
+        setPhotoProgress({ done, total })
+      );
+      setPhotoProgress(null);
+      const result = withImages(created, images);
+      if (failed > 0) {
+        // Échec partiel : l'annonce existe ; on bascule en modification pour réessayer ou retirer.
+        setCurrent(result);
+        setFormError(interpolate(t("host.photos.partialFailure"), { failed, total: pending.length }));
+        onDraftSaved?.(result);
+        return;
+      }
+      onSaved(result, false);
     } catch (err) {
       if (err?.status === 400 && Array.isArray(err.details) && err.details.length > 0) {
         const serverErrors = {};
@@ -247,8 +274,6 @@ const ListingForm = ({ listing, onSaved, onCancel }) => {
         {errors[name]}
       </span>
     ) : null;
-
-  const imagePreview = isHttpsUrl(form.imageUrl.trim()) && !imageBroken;
 
   return (
     <form ref={formRef} className="listing-form" onSubmit={handleSubmit} noValidate aria-labelledby="listing-form-title">
@@ -361,25 +386,42 @@ const ListingForm = ({ listing, onSaved, onCancel }) => {
           {fieldError("acceptsPets")}
         </label>
 
-        <div className="listing-form-field listing-form-field--wide">
-          <label htmlFor="listing-imageUrl">{t("host.fields.imageUrl")}</label>
-          <input
-            type="url"
-            value={form.imageUrl}
-            onChange={(e) => {
-              setImageBroken(false);
-              setField("imageUrl", e.target.value);
-            }}
-            placeholder="https://"
-            {...fieldProps("imageUrl")}
-          />
-          {fieldError("imageUrl")}
-        </div>
-        {imagePreview && (
-          <div className="listing-form-preview listing-form-field--wide">
-            <img src={form.imageUrl.trim()} alt={t("host.imagePreview")} onError={() => setImageBroken(true)} />
+        <div className="listing-form-field listing-form-field--wide listing-form-switch">
+          <div className="listing-form-switch-row">
+            <label htmlFor="listing-instantBook" className="listing-form-switch-label">
+              {t("host.instantBook.label")}
+            </label>
+            <input
+              type="checkbox"
+              role="switch"
+              className="listing-form-switch-input"
+              checked={form.instantBook}
+              onChange={(e) => setField("instantBook", e.target.checked)}
+              {...fieldProps("instantBook")}
+              aria-describedby="listing-instantBook-help"
+            />
           </div>
-        )}
+          <span id="listing-instantBook-help" className="listing-form-hint">
+            {form.instantBook ? t("host.instantBook.on") : t("host.instantBook.off")}
+          </span>
+          {fieldError("instantBook")}
+        </div>
+
+        <div className="listing-form-field listing-form-field--wide">
+          <AmenitiesField value={form.amenities} onChange={(codes) => setField("amenities", codes)} />
+          {fieldError("amenities")}
+        </div>
+
+        <div className="listing-form-field listing-form-field--wide">
+          <PhotoManager
+            listingId={isEdit ? current.id : null}
+            items={photos}
+            setItems={setPhotos}
+            progress={photoProgress}
+            setProgress={setPhotoProgress}
+            disabled={submitting}
+          />
+        </div>
       </div>
 
       {formError && (

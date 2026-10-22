@@ -19,58 +19,137 @@ enum Role {
   ADMIN
 }
 
+// PENDING : demande en attente de l'hôte (annonce sans réservation instantanée), expire après
+// 48 h (voir src/utils/bookingStatus.js). DECLINED : refusée par l'hôte. EXPIRED : sans réponse.
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  DECLINED
+  EXPIRED
+}
+
+enum ListingStatus {
+  ACTIVE
+  HIDDEN
+}
+
+// Équipements (filtre ?amenities=WIFI,POOL : tous requis).
+enum Amenity {
+  WIFI
+  AIR_CONDITIONING
+  FAN
+  POOL
+  PARKING
+  KITCHEN
+  WASHER
+  TV
+  WORKSPACE
+  GENERATOR
+  SOLAR_POWER
+  WATER_TANK
+  WATER_HEATER
+  SECURITY
+  CCTV
+  BREAKFAST
+  SEA_VIEW
+  BEACH_ACCESS
+  GARDEN
+  TERRACE
+  BBQ
+  MOSQUITO_NETS
+  AIRPORT_SHUTTLE
+  HOUSEKEEPING
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique @db.VarChar(254)
-  password  String
-  name      String?  @db.VarChar(100)
-  avatar    String?  @db.VarChar(2048)
-  role      Role     @default(GUEST)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique @db.VarChar(254)
+  password          String
+  name              String?   @db.VarChar(100)
+  avatar            String?   @db.VarChar(2048)
+  role              Role      @default(GUEST)
+  // Dernier changement / réinitialisation du mot de passe : les JWT émis avant sont refusés.
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  listings  Listing[]
-  favorites Favorite[]
-  bookings  Booking[]
-  reviews   Review[]
+  listings            Listing[]
+  favorites           Favorite[]
+  bookings            Booking[]
+  reviews             Review[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Listing {
-  id            String   @id @default(cuid())
-  title         String   @db.VarChar(200)
-  description   String?  @db.VarChar(5000)
-  location      String   @db.VarChar(200)
-  address       String?  @db.VarChar(300)
+  id            String        @id @default(cuid())
+  title         String        @db.VarChar(200)
+  description   String?       @db.VarChar(5000)
+  location      String        @db.VarChar(200)
+  address       String?       @db.VarChar(300)
   latitude      Float?
   longitude     Float?
-  pricePerNight Decimal  @db.Decimal(10, 2)
-  currency      String   @default("XOF") @db.VarChar(3)
-  maxGuests     Int      @default(4)
-  bedrooms      Int      @default(1)
+  pricePerNight Decimal       @db.Decimal(10, 2)
+  currency      String        @default("XOF") @db.VarChar(3)
+  maxGuests     Int           @default(4)
+  bedrooms      Int           @default(1)
   // Calculés à partir des avis (moyenne arrondie à 2 décimales) : jamais saisis par l'hôte.
-  rating        Decimal? @db.Decimal(3, 2)
-  reviewCount   Int      @default(0)
-  imageUrl      String?  @db.VarChar(2048)
-  categoryId    String?  @db.VarChar(50)
-  acceptsPets   Boolean  @default(false)
+  rating        Decimal?      @db.Decimal(3, 2)
+  reviewCount   Int           @default(0)
+  // Image de couverture = première ListingImage (synchronisée automatiquement), conservée pour
+  // la compatibilité des clients existants.
+  imageUrl      String?       @db.VarChar(2048)
+  categoryId    String?       @db.VarChar(50)
+  acceptsPets   Boolean       @default(false)
+  amenities     Amenity[]     @default([])
+  // false : les réservations sont créées en PENDING et doivent être acceptées par l'hôte.
+  instantBook   Boolean       @default(true)
+  // HIDDEN (modération) : invisible du public, visible par l'hôte et les admins.
+  status        ListingStatus @default(ACTIVE)
   hostId        String
-  host          User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  host          User          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  favorites Favorite[]
-  bookings  Booking[]
-  reviews   Review[]
+  favorites      Favorite[]
+  bookings       Booking[]
+  reviews        Review[]
+  images         ListingImage[]
+  blockedPeriods BlockedPeriod[]
 
   @@index([latitude, longitude])
   @@index([hostId])
   @@index([categoryId])
+  @@index([status])
+}
+
+model ListingImage {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url       String   @db.VarChar(2048)
+  // Clé dans le stockage (null : image externe, ex. Unsplash, jamais supprimée du stockage).
+  path      String?  @db.VarChar(512)
+  position  Int      @default(0)
+  alt       String?  @db.VarChar(200)
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  @@index([listingId, position])
+}
+
+// Dates bloquées par l'hôte : nuits [startDate, endDate[ (même convention que Booking).
+model BlockedPeriod {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  reason    String?  @db.VarChar(200)
+  createdAt DateTime @default(now())
+
+  @@index([listingId, startDate, endDate])
 }
 
 model Favorite {
@@ -103,6 +182,7 @@ model Booking {
 
   @@index([listingId, checkIn, checkOut])
   @@index([guestId])
+  @@index([status, createdAt])
 }
 
 model Review {
@@ -119,4 +199,17 @@ model Review {
 
   @@index([listingId, createdAt])
   @@index([authorId])
+}
+
+// Jeton de réinitialisation du mot de passe : seul le hash SHA-256 est stocké (1 h, usage unique).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }

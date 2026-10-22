@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
+import { AMENITIES, LISTING_SORTS } from "../api/client";
 
 const SearchContext = createContext(null);
 
@@ -24,7 +25,18 @@ export const DEFAULT_APPLIED_SEARCH = {
   babies: 0,
   pets: 0,
   categoryId: null,
+  // Filtres avancés (panneau « Filtres ») et tri.
+  minPrice: null,
+  maxPrice: null,
+  amenities: [],
+  sort: "recommended",
 };
+
+// Nombre de filtres actifs : la fourchette de prix compte pour un, chaque équipement pour un.
+export function countActiveFilters(applied) {
+  const price = applied.minPrice != null || applied.maxPrice != null ? 1 : 0;
+  return price + (applied.amenities?.length || 0);
+}
 
 const COUNT_KEYS = ["adults", "children", "babies", "pets"];
 
@@ -53,6 +65,10 @@ export function searchToQuery(applied) {
   COUNT_KEYS.forEach((k) => {
     if (applied[k] > 0) params.set(k, String(applied[k]));
   });
+  if (applied.minPrice != null) params.set("minPrice", String(applied.minPrice));
+  if (applied.maxPrice != null) params.set("maxPrice", String(applied.maxPrice));
+  if (applied.amenities?.length) params.set("amenities", applied.amenities.join(","));
+  if (applied.sort && applied.sort !== "recommended") params.set("sort", applied.sort);
   return params.toString();
 }
 
@@ -68,6 +84,18 @@ export function searchFromQuery(query) {
     const n = parseInt(params.get(k), 10);
     result[k] = Number.isFinite(n) && n > 0 ? n : 0;
   });
+  const price = (key) => {
+    const raw = params.get(key);
+    const n = raw == null || raw === "" ? NaN : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  result.minPrice = price("minPrice");
+  result.maxPrice = price("maxPrice");
+  result.amenities = (params.get("amenities") || "")
+    .split(",")
+    .filter((code, i, all) => AMENITIES.includes(code) && all.indexOf(code) === i);
+  const sort = params.get("sort");
+  result.sort = LISTING_SORTS.includes(sort) ? sort : "recommended";
   return result;
 }
 
@@ -79,8 +107,11 @@ function initialAppliedSearch() {
 export const SearchProvider = ({ children }) => {
   const [appliedSearch, setAppliedSearch] = useState(initialAppliedSearch);
   const [searchParams, setSearchParamsState] = useState(() => {
-    const { categoryId, ...fromUrl } = appliedSearch;
-    return { ...DEFAULT_DRAFT, ...fromUrl };
+    const draft = { ...DEFAULT_DRAFT };
+    Object.keys(DEFAULT_DRAFT).forEach((k) => {
+      if (k in appliedSearch) draft[k] = appliedSearch[k];
+    });
+    return draft;
   });
 
   const setSearchParams = useCallback((updater) => {
@@ -107,14 +138,37 @@ export const SearchProvider = ({ children }) => {
     }));
   }, []);
 
+  // Panneau de filtres : prix (null = sans borne) et équipements.
+  const applyFilters = useCallback(({ minPrice = null, maxPrice = null, amenities = [] } = {}) => {
+    setAppliedSearch((prev) => ({ ...prev, minPrice, maxPrice, amenities: [...amenities] }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setAppliedSearch((prev) => ({ ...prev, minPrice: null, maxPrice: null, amenities: [] }));
+  }, []);
+
+  const setSort = useCallback((sort) => {
+    setAppliedSearch((prev) => ({ ...prev, sort: LISTING_SORTS.includes(sort) ? sort : "recommended" }));
+  }, []);
+
   const resetSearch = useCallback(() => {
     setSearchParamsState(DEFAULT_DRAFT);
     setAppliedSearch(DEFAULT_APPLIED_SEARCH);
   }, []);
 
   const value = useMemo(
-    () => ({ searchParams, setSearchParams, appliedSearch, applySearch, toggleCategory, resetSearch }),
-    [searchParams, setSearchParams, appliedSearch, applySearch, toggleCategory, resetSearch]
+    () => ({
+      searchParams,
+      setSearchParams,
+      appliedSearch,
+      applySearch,
+      toggleCategory,
+      applyFilters,
+      clearFilters,
+      setSort,
+      resetSearch,
+    }),
+    [searchParams, setSearchParams, appliedSearch, applySearch, toggleCategory, applyFilters, clearFilters, setSort, resetSearch]
   );
 
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;

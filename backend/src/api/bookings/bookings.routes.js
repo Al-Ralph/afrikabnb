@@ -15,6 +15,8 @@ const createReviewSchema = z
 const router = Router();
 
 router.patch("/:id/cancel", authenticateToken, bookingsController.cancel);
+router.patch("/:id/confirm", authenticateToken, bookingsController.confirm);
+router.patch("/:id/decline", authenticateToken, bookingsController.decline);
 // Validation avant authentification : un corps invalide est rejeté (400) sans requête en base.
 router.post("/:id/review", validate(createReviewSchema), authenticateToken, reviewsController.create);
 

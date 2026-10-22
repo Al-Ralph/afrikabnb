@@ -1,0 +1,352 @@
+/* --- Galerie de la fiche : grille desktop ---------------------------------- */
+.photo-gallery {
+  position: relative;
+  margin: 0;
+}
+
+.photo-gallery--empty,
+.photo-grid {
+  aspect-ratio: 2 / 1;
+  max-height: 560px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+
+.photo-gallery-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface-3);
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.photo-grid[data-count="1"] {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.photo-grid[data-count="2"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.photo-grid[data-count="2"] .photo-grid-tile:nth-child(2) {
+  grid-row: 1 / 3;
+}
+
+.photo-grid[data-count="3"] {
+  grid-template-columns: 2fr 1fr;
+}
+
+.photo-grid[data-count="4"] .photo-grid-tile:nth-child(2) {
+  grid-row: 1 / 3;
+}
+
+.photo-grid-tile {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: var(--color-surface-3);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.photo-grid-tile--main {
+  grid-row: 1 / 3;
+}
+
+.photo-grid-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter var(--dur-slow) var(--ease-std), transform 700ms var(--ease-out);
+}
+
+.photo-grid-tile--main img {
+  animation: photo-grid-in 900ms var(--ease-out) both;
+}
+
+@keyframes photo-grid-in {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+}
+
+.photo-grid-tile:hover img {
+  filter: brightness(0.9);
+  transform: scale(1.02);
+}
+
+.photo-grid-tile:focus-visible {
+  outline: none;
+}
+
+.photo-grid-tile:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 3px var(--color-focus);
+}
+
+.photo-grid-all {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  box-shadow: var(--shadow-md);
+}
+
+/* --- Carrousel mobile --------------------------------------------------------- */
+.photo-carousel {
+  aspect-ratio: 4 / 3;
+  margin: 0 calc(-1 * var(--gutter));
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.photo-carousel-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.photo-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.photo-carousel-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: var(--color-surface-3);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.photo-carousel-slide:focus-visible {
+  outline-offset: -3px;
+}
+
+.photo-carousel-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-carousel-nav {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  opacity: 0.92;
+  transform: translateY(-50%);
+}
+
+/* Cible tactile de 44 px autour de la pastille de 36 px. */
+.photo-carousel-nav::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+.photo-carousel-nav--prev {
+  left: var(--space-3);
+}
+
+.photo-carousel-nav--next {
+  right: var(--space-3);
+}
+
+.photo-carousel-counter {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  margin: 0;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-overlay);
+  color: var(--color-text-inverse);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le voile sombre reste sombre dans les deux thèmes : texte clair fixe. */
+:root[data-theme="dark"] .photo-carousel-counter {
+  color: var(--color-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .photo-carousel-counter {
+    color: var(--color-text);
+  }
+}
+
+/* --- Visionneuse plein écran ------------------------------------------------- */
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  animation: photo-viewer-in var(--dur) var(--ease-std);
+}
+
+@keyframes photo-viewer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.photo-viewer-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: var(--space-2) var(--gutter);
+  flex-shrink: 0;
+}
+
+.photo-viewer-close {
+  position: absolute;
+  left: var(--gutter);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.photo-viewer-close:hover {
+  background: var(--color-surface-2);
+}
+
+.photo-viewer-counter {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-viewer-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: 0 var(--gutter) var(--space-6);
+}
+
+.photo-viewer-figure {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-viewer-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  animation: photo-viewer-img-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes photo-viewer-img-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.photo-viewer-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: background-color var(--dur) var(--ease-std), border-color var(--dur) var(--ease-std);
+}
+
+.photo-viewer-nav:hover {
+  border-color: var(--color-text);
+  background: var(--color-surface-2);
+}
+
+@media (max-width: 743px) {
+  .photo-viewer-stage {
+    padding: 0 0 var(--space-7);
+  }
+
+  .photo-viewer-img {
+    border-radius: 0;
+  }
+
+  /* Flèches posées sur la photo, de part et d'autre. */
+  .photo-viewer-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    width: 44px;
+    height: 44px;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-50%);
+  }
+
+  .photo-viewer-nav--prev {
+    left: var(--space-3);
+  }
+
+  .photo-viewer-nav--next {
+    right: var(--space-3);
+  }
+}

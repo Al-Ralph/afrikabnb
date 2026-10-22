@@ -132,3 +132,28 @@ describe("Header — visitor", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("AuthModal");
   });
 });
+
+describe("Header — roles", () => {
+  test("an admin sees « Administration » and the host dashboard link", () => {
+    setup({ user: { ...kofi, role: "ADMIN" } });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    const m = within(menu());
+    expect(m.getByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin");
+    expect(m.getByRole("link", { name: "Tableau de bord hôte" })).toHaveAttribute("href", "/host");
+  });
+
+  test("a host sees « Tableau de bord hôte » but no administration link", () => {
+    setup({ user: { ...kofi, role: "HOST" } });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    const m = within(menu());
+    expect(m.getByRole("link", { name: "Tableau de bord hôte" })).toHaveAttribute("href", "/host");
+    expect(m.queryByRole("link", { name: "Administration" })).toBeNull();
+  });
+
+  test("a guest has no administration link", () => {
+    setup({ user: { ...kofi, role: "GUEST" } });
+    fireEvent.click(screen.getByRole("button", { name: /Menu du compte/ }));
+    expect(within(menu()).queryByRole("link", { name: "Administration" })).toBeNull();
+    expect(within(menu()).getByRole("link", { name: "Espace hôte" })).toBeInTheDocument();
+  });
+});

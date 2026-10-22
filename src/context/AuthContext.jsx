@@ -11,13 +11,20 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   // Fenêtre de connexion partagée : le Header l'affiche, n'importe quel composant peut l'ouvrir.
   const [authOpen, setAuthOpen] = useState(false);
-  const openAuth = useCallback(() => setAuthOpen(true), []);
+  // Écran affiché à l'ouverture : "login", "register" ou "forgot" (mot de passe oublié).
+  const [authMode, setAuthMode] = useState("login");
+  const openAuth = useCallback((mode) => {
+    setAuthMode(typeof mode === "string" ? mode : "login");
+    setAuthOpen(true);
+  }, []);
   const closeAuth = useCallback(() => setAuthOpen(false), []);
 
-  // Les composants hors du contexte (BookingWidget, Host) demandent l'ouverture par événement.
+  // Les composants hors du contexte (BookingWidget, Host) demandent l'ouverture par événement
+  // (detail.mode facultatif).
   useEffect(() => {
-    window.addEventListener(OPEN_AUTH_EVENT, openAuth);
-    return () => window.removeEventListener(OPEN_AUTH_EVENT, openAuth);
+    const onOpen = (e) => openAuth(e?.detail?.mode);
+    window.addEventListener(OPEN_AUTH_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_AUTH_EVENT, onOpen);
   }, [openAuth]);
 
   useEffect(() => {
@@ -62,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, updateUser, authOpen, openAuth, closeAuth }}
+      value={{ user, loading, login, register, logout, updateUser, authOpen, authMode, openAuth, closeAuth }}
     >
       {children}
     </AuthContext.Provider>

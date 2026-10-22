@@ -31,6 +31,8 @@ const BookingWidget = ({ listing, demo = false }) => {
   const maxGuests = Math.max(1, Number(listing.maxGuests) || 1);
   const currency = listing.currency || "XOF";
   const price = Number(listing.price) || 0;
+  // Réservation sur demande : la réservation créée est PENDING jusqu'à la réponse de l'hôte (48 h).
+  const onRequest = listing.instantBook === false;
 
   // Pré-remplissage depuis la recherche appliquée (dates futures uniquement).
   const [checkIn, setCheckIn] = useState(() => {
@@ -167,6 +169,7 @@ const BookingWidget = ({ listing, demo = false }) => {
           </p>
         ) : (
           <form onSubmit={handleSubmit} noValidate>
+            {onRequest && <p className="booking-widget-request-note">{t("bookingRequest.note")}</p>}
             <div className="booking-widget-fields">
               <button
                 type="button"
@@ -260,7 +263,9 @@ const BookingWidget = ({ listing, demo = false }) => {
               <p className="booking-widget-note">{t("booking.ownListing")}</p>
             ) : (
               <button type="submit" className="booking-widget-submit" disabled={submitting || datesConflict}>
-                {submitting ? t("booking.submitting") : t("booking.reserve")}
+                {submitting
+                  ? t(onRequest ? "bookingRequest.submitting" : "booking.submitting")
+                  : t(onRequest ? "bookingRequest.submit" : "booking.reserve")}
               </button>
             )}
 
@@ -281,9 +286,10 @@ const BookingWidget = ({ listing, demo = false }) => {
               <div className="booking-widget-success" role="status">
                 <p>
                   <strong>
-                    {confirmation.status === "PENDING" ? t("booking.pending") : t("booking.confirmed")}
+                    {confirmation.status === "PENDING" ? t("bookingRequest.sentTitle") : t("booking.confirmed")}
                   </strong>
                 </p>
+                {confirmation.status === "PENDING" && <p>{t("bookingRequest.sentText")}</p>}
                 <p>
                   {formatDay(confirmation.checkIn, language)} → {formatDay(confirmation.checkOut, language)} ·{" "}
                   {formatPrice(confirmation.totalPrice, confirmation.currency || currency, language)}
@@ -308,7 +314,7 @@ const BookingWidget = ({ listing, demo = false }) => {
           </span>
         </span>
         <button type="button" className="booking-mobile-bar-btn" onClick={scrollToWidget}>
-          {demo ? t("booking.details") : t("booking.reserve")}
+          {demo ? t("booking.details") : t(onRequest ? "bookingRequest.submit" : "booking.reserve")}
         </button>
       </div>
     </>

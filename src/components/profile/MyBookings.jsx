@@ -6,6 +6,8 @@ import EmptyState from "../EmptyState";
 import { ListSkeleton } from "../Skeleton";
 
 const GROUPS = ["upcoming", "past", "cancelled"];
+// Réservations closes sans séjour : annulées, refusées par l'hôte ou demandes expirées.
+const CLOSED = new Set(["CANCELLED", "DECLINED", "EXPIRED"]);
 
 const MyBookings = () => {
   const { t } = useLanguage();
@@ -40,7 +42,7 @@ const MyBookings = () => {
   const groups = useMemo(() => {
     const result = { upcoming: [], past: [], cancelled: [] };
     bookings.forEach((b) => {
-      if (b.status === "CANCELLED") result.cancelled.push(b);
+      if (CLOSED.has(b.status)) result.cancelled.push(b);
       else if (b.checkOut > today) result.upcoming.push(b);
       else result.past.push(b);
     });

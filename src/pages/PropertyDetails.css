@@ -104,33 +104,29 @@
   flex-shrink: 0;
 }
 
-/* --- Photo ----------------------------------------------------------------- */
-.property-details-image-wrap {
-  margin: 0;
-  aspect-ratio: 2 / 1;
-  max-height: 600px;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
+/* --- Mode de réservation (instantanée / sur demande) ------------------------ */
+.property-details-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 10px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
-.property-details-image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  animation: property-photo-in 900ms var(--ease-out) both;
+.property-details-mode .icon {
+  color: var(--color-text-muted);
 }
 
-.property-details-image--empty {
-  background: var(--color-surface-3);
+.property-details-mode--instant {
+  background: var(--color-primary-soft);
 }
 
-@keyframes property-photo-in {
-  from {
-    opacity: 0;
-    transform: scale(1.025);
-  }
+.property-details-mode--instant .icon {
+  color: var(--color-primary);
 }
 
 /* --- Mise en page ------------------------------------------------------------ */
@@ -255,13 +251,6 @@
 @media (max-width: 600px) {
   .property-details-header {
     margin-bottom: var(--space-4);
-  }
-
-  /* Photo pleine largeur sur mobile */
-  .property-details-image-wrap {
-    aspect-ratio: 4 / 3;
-    margin: 0 calc(-1 * var(--gutter));
-    border-radius: 0;
   }
 
   .property-details-facts {
