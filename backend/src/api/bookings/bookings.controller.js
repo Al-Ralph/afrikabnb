@@ -12,6 +12,9 @@ import {
   todayDay,
 } from "../../utils/booking.js";
 import {
+  MAX_PENDING_PER_GUEST,
+  MAX_REQUEST_NIGHTS,
+  activePendingWhere,
   blockingBookingWhere,
   effectiveStatus,
   expiredPendingWhere,
@@ -107,6 +110,17 @@ export async function create(req, res, next) {
       if (guests > Number(listing.maxGuests)) {
         throw httpError(400, `Capacité maximale dépassée (${listing.maxGuests} voyageurs)`);
       }
+      if (!listing.instantBook) {
+        if (nights > MAX_REQUEST_NIGHTS) {
+          throw httpError(400, `Une demande est limitée à ${MAX_REQUEST_NIGHTS} nuits (réservation instantanée non disponible pour cette annonce)`);
+        }
+        // Verrou du voyageur : deux demandes simultanées ne peuvent pas dépasser le quota.
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${req.user.id} FOR UPDATE`;
+        const pending = await tx.booking.count({ where: { guestId: req.user.id, ...activePendingWhere() } });
+        if (pending >= MAX_PENDING_PER_GUEST) {
+          throw httpError(429, "Trop de demandes en attente : attendez la réponse des hôtes");
+        }
+      }
       const totalPrice = computeTotalPrice(listing.pricePerNight, nights);
       if (totalPrice > MAX_AMOUNT) throw httpError(400, "Montant total trop élevé");
 
@@ -186,7 +200,7 @@ async function transition(req, action, allowed) {
   return prisma.$transaction(async (tx) => {
     const found = await tx.booking.findUnique({
       where: { id: req.params.id },
-      include: { listing: { select: { hostId: true } } },
+      include: { listing: { select: { hostId: true, status: true } } },
     });
     if (!found) throw httpError(404, "Réservation introuvable");
     const forbidden = allowed(found, req.user);
@@ -195,6 +209,10 @@ async function transition(req, action, allowed) {
     await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${found.listingId} FOR UPDATE`;
     const booking = await tx.booking.findUnique({ where: { id: found.id } });
     const result = nextStatus(booking, action);
+    // Annonce masquée / suspendue : une demande ne peut plus être acceptée (le refus reste permis).
+    if (result.ok && action === "confirm" && found.listing.status !== "ACTIVE") {
+      throw httpError(409, "Annonce non active : impossible d'accepter cette demande");
+    }
     if (!result.ok) {
       if (result.expired && booking.status === "PENDING") {
         await tx.booking.update({ where: { id: booking.id }, data: { status: "EXPIRED" } });

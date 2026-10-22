@@ -102,4 +102,25 @@ describe("ResetPassword page", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Ce lien est incomplet.");
     expect(screen.queryByLabelText("Nouveau mot de passe")).toBeNull();
   });
+
+  test("removes the token from the address bar, keeps it for submission, and sets a no-referrer meta while mounted", async () => {
+    api.resetPassword.mockResolvedValue({ message: "ok" });
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    mockQuery = `token=${TOKEN}`;
+    const { unmount } = render(
+      <LanguageProvider>
+        <ResetPassword />
+      </LanguageProvider>
+    );
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/reinitialiser-mot-de-passe");
+    expect(document.head.querySelector('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+
+    fill("nouveau-secret");
+    await screen.findByText("Mot de passe modifié");
+    expect(api.resetPassword).toHaveBeenCalledWith(TOKEN, "nouveau-secret");
+
+    unmount();
+    expect(document.head.querySelector('meta[name="referrer"]')).toBeNull();
+    replaceState.mockRestore();
+  });
 });

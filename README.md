@@ -109,6 +109,8 @@ Créés par `npm run db:seed` (refusé si `NODE_ENV=production`). Mot de passe c
 | `awa@afrikabnb.com` | Hôte |
 | `kofi@afrikabnb.com` | Voyageur |
 
+Aucun compte administrateur n'utilise ce mot de passe public. Pour en créer un, définir `SEED_ADMIN_PASSWORD` (12 caractères minimum) dans `backend/.env` avant le seed, ou lancer `node scripts/rotate-admin-password.mjs` dans `backend/` pour remplacer le mot de passe d'un admin existant (il est écrit uniquement dans `.env`).
+
 Le seed est idempotent (relançable sans doublon) : 20 annonces réparties sur les 9 catégories, des réservations passées et à venir, et des avis.
 
 > Ces comptes et ce mot de passe sont réservés à la démo locale : ne jamais les utiliser en production.

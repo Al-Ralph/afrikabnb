@@ -6,7 +6,9 @@ import * as reviewsController from "../reviews/reviews.controller.js";
 import * as favoritesController from "../favorites/favorites.controller.js";
 import * as imagesController from "./images.controller.js";
 import * as blockedPeriodsController from "./blockedPeriods.controller.js";
-import { authenticateToken, optionalAuth, requireValidToken } from "../../middleware/auth.js";
+import { authenticateToken, optionalAuth } from "../../middleware/auth.js";
+import { requireListingOwner } from "../../middleware/listingOwner.js";
+import { acquireUploadSlot } from "../../middleware/uploadSlot.js";
 import { validate } from "../../middleware/validate.js";
 import { receiveImages, MAX_IMAGES_PER_LISTING } from "../../middleware/upload.js";
 import { amenityEnum, day, listingFilterFields, stayOrderRefinement } from "./listings.query.js";
@@ -151,13 +153,15 @@ router.get(
   bookingsController.availability
 );
 
-// Photos. Ordre des contrôles du téléversement : signature du token (sans base), réception
-// multipart avec limites (taille, nombre), type réel par magic bytes, PUIS utilisateur en base.
+// Photos. Ordre des contrôles du téléversement : authentification complète (utilisateur en base),
+// propriété de l'annonce, place disponible (2 envois simultanés max), PUIS réception multipart
+// avec limites (taille, nombre) et type réel par magic bytes.
 router.post(
   "/:id/images",
-  requireValidToken,
-  receiveImages,
   authenticateToken,
+  requireListingOwner,
+  acquireUploadSlot,
+  receiveImages,
   imagesController.upload
 );
 // "/order" déclaré avant "/:imageId".

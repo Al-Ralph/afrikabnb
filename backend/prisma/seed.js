@@ -26,8 +26,16 @@ const users = [
   { key: "demo", email: "host@afrikabnb.com", name: "AfrikaBnB Demo", role: "HOST" },
   { key: "awa", email: "awa@afrikabnb.com", name: "Awa Diop", role: "HOST" },
   { key: "kofi", email: "kofi@afrikabnb.com", name: "Kofi Mensah", role: "GUEST" },
-  { key: "admin", email: "admin@afrikabnb.com", name: "Admin AfrikaBnB", role: "ADMIN" },
 ];
+
+// Le compte ADMIN n'utilise jamais le mot de passe de démo (publié dans le README) :
+// il n'est créé que si SEED_ADMIN_PASSWORD (12 caractères minimum) est défini dans .env.
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@afrikabnb.com";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
+if (ADMIN_PASSWORD && ADMIN_PASSWORD.length < 12) {
+  console.error("Seed refusé : SEED_ADMIN_PASSWORD doit contenir au moins 12 caractères.");
+  process.exit(1);
+}
 
 const img = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80`;
 
@@ -181,6 +189,13 @@ async function main() {
     });
     userIds[u.key] = user.id;
   }
+  if (ADMIN_PASSWORD) {
+    await prisma.user.upsert({
+      where: { email: ADMIN_EMAIL },
+      update: { role: "ADMIN" },
+      create: { email: ADMIN_EMAIL, password: await bcrypt.hash(ADMIN_PASSWORD, 12), name: "Admin AfrikaBnB", role: "ADMIN" },
+    });
+  }
 
   const seededIds = listings.map((l) => l.id);
   await prisma.listing.deleteMany({
@@ -319,7 +334,8 @@ async function main() {
   console.log(
     `Seed OK : ${users.length} utilisateurs (mot de passe : ${DEMO_PASSWORD}), ` +
       `${listings.length} annonces (photos et équipements), ${bookings.length} réservations, ` +
-      `${blockedPeriods.length} périodes bloquées. Admin : admin@afrikabnb.com.`
+      `${blockedPeriods.length} périodes bloquées. ` +
+      (ADMIN_PASSWORD ? `Admin : ${ADMIN_EMAIL} (mot de passe de SEED_ADMIN_PASSWORD).` : "Aucun admin (SEED_ADMIN_PASSWORD absent).")
   );
 }
 

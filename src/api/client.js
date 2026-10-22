@@ -217,7 +217,10 @@ export const api = {
 
   // --- Profil ---
   async updateProfile(data) {
-    return request("/api/users/me", jsonBody("PATCH", data));
+    const { token, ...user } = await request("/api/users/me", jsonBody("PATCH", data));
+    // Changement de mot de passe : les autres sessions sont révoquées, le nouveau jeton garde celle-ci.
+    if (token) localStorage.setItem("afrikabnb_token", token);
+    return user;
   },
 
   // --- Favoris ---

@@ -358,7 +358,8 @@ Chaque action d’écriture est journalisée : `req.log.info({ adminId, action, 
 
 `npm run db:seed` (refusé si `NODE_ENV=production`) est idempotent : identifiants fixes et `upsert`, il peut être relancé sans doublon. Il crée :
 
-- 4 comptes (mot de passe `demo1234`) : `host@afrikabnb.com` (HOST, compte de démo historique), `awa@afrikabnb.com` (HOST), `kofi@afrikabnb.com` (GUEST), `admin@afrikabnb.com` (**ADMIN**) ;
+- 3 comptes de démo (mot de passe public `demo1234`) : `host@afrikabnb.com` (HOST, compte de démo historique), `awa@afrikabnb.com` (HOST), `kofi@afrikabnb.com` (GUEST) ;
+- un compte **ADMIN** (`SEED_ADMIN_EMAIL`, par défaut `admin@afrikabnb.com`) **seulement si** `SEED_ADMIN_PASSWORD` (12 caractères minimum) est défini : jamais avec le mot de passe de démo. Pour changer le mot de passe d'un admin existant et révoquer ses sessions : `node scripts/rotate-admin-password.mjs [email]` (le nouveau mot de passe est écrit uniquement dans `.env`, jamais affiché) ;
 - 20 annonces avec coordonnées réelles, au moins 2 par catégorie du front (`piscines`, `bord-mer`, `safari`, `cabanes`, `tendance`, `omg`, `parcs`, `iles`, `luxe`), prix en XOF, équipements, 2 à 4 photos Unsplash chacune (position 0 = `imageUrl`) ; 3 annonces sur demande (`instantBook: false` : Gorée, Palmeraie, Ikoyi) ;
 - 26 réservations (passées, à venir, une annulée, une demande `PENDING` à Gorée — expirée 48 h après le seed —, une refusée) dont 19 avec avis ; `rating` et `reviewCount` sont recalculés depuis les avis ;
 - 2 périodes bloquées (Lomé, Kpalimé).

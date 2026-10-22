@@ -180,3 +180,20 @@ describe("vague 3 : filtres, photos, réservations sur demande, admin", () => {
     await expect(api.getAdminStats()).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe("updateProfile", () => {
+  test("stores the fresh token returned after a password change and strips it from the user", async () => {
+    localStorage.setItem("afrikabnb_token", "ancien");
+    global.fetch.mockResolvedValue(jsonResponse({ id: "u1", name: "Kofi", token: "nouveau" }));
+    const user = await api.updateProfile({ currentPassword: "a", newPassword: "b" });
+    expect(localStorage.getItem("afrikabnb_token")).toBe("nouveau");
+    expect(user).toEqual({ id: "u1", name: "Kofi" });
+  });
+
+  test("keeps the current token when the response carries none", async () => {
+    localStorage.setItem("afrikabnb_token", "actuel");
+    global.fetch.mockResolvedValue(jsonResponse({ id: "u1", name: "Kofi" }));
+    await api.updateProfile({ name: "Kofi" });
+    expect(localStorage.getItem("afrikabnb_token")).toBe("actuel");
+  });
+});

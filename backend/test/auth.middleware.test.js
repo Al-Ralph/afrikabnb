@@ -12,7 +12,7 @@ process.env.NODE_ENV = "test";
 process.env.STORAGE_DRIVER = "local";
 process.env.EMAIL_DRIVER = "console";
 
-const { authenticateToken } = await import("../src/middleware/auth.js");
+const { authenticateToken, optionalAuth } = await import("../src/middleware/auth.js");
 const { default: prisma } = await import("../src/config/db.js");
 
 function call(token, user) {
@@ -53,4 +53,22 @@ test("authenticateToken : JWT émis avant passwordChangedAt refusé (401)", asyn
   // passwordChangedAt n'est jamais exposé dans req.user (renvoyé par /api/auth/me).
   assert.equal("passwordChangedAt" in fresh.user, false);
   assert.equal((await call(sign(nowSec - 120), { ...baseUser, passwordChangedAt: null })).status, 200);
+});
+
+async function callOptional(token, user) {
+  prisma.user.findUnique = async () => user;
+  const req = { headers: token ? { authorization: `Bearer ${token}` } : {} };
+  const err = await new Promise((resolve) => optionalAuth(req, {}, resolve));
+  return { userId: req.userId, err };
+}
+
+test("optionalAuth : userId renseigné seulement pour un JWT valide et non révoqué", async () => {
+  const changedAt = new Date((nowSec - 60) * 1000);
+  assert.equal((await callOptional(sign(nowSec - 30), { ...baseUser, passwordChangedAt: changedAt })).userId, "u1");
+  assert.equal((await callOptional(sign(nowSec - 120), { ...baseUser, passwordChangedAt: changedAt })).userId, undefined);
+  assert.equal((await callOptional(sign(nowSec - 30), null)).userId, undefined);
+  assert.equal((await callOptional("abc.def.ghi", baseUser)).userId, undefined);
+  const anon = await callOptional(null, baseUser);
+  assert.equal(anon.userId, undefined);
+  assert.equal(anon.err, undefined);
 });
