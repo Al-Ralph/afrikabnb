@@ -5,6 +5,7 @@ import PlacesAutocompleteInput from "./PlacesAutocompleteInput";
 import DatePickerPanel from "./DatePickerPanel";
 import GuestsPanel from "./GuestsPanel";
 import { formatDateShort } from "../utils/dateUtils";
+import { pluralize } from "../utils/plural";
 import "./SearchBar.css";
 
 const PinIcon = () => (
@@ -38,17 +39,17 @@ const SearchIcon = () => (
   </svg>
 );
 
-function formatGuestsSummary(adults, children, babies, pets) {
+function formatGuestsSummary(t, language, { adults, children, babies, pets }) {
   const parts = [];
-  if (adults > 0) parts.push(adults === 1 ? "1 adulte" : `${adults} adultes`);
-  if (children > 0) parts.push(children === 1 ? "1 enfant" : `${children} enfants`);
-  if (babies > 0) parts.push(babies === 1 ? "1 bébé" : `${babies} bébés`);
-  if (pets > 0) parts.push(pets === 1 ? "1 animal" : `${pets} animaux`);
-  return parts.length ? parts.join(", ") : "";
+  if (adults > 0) parts.push(pluralize(t, language, "guests.summary.adults", adults));
+  if (children > 0) parts.push(pluralize(t, language, "guests.summary.children", children));
+  if (babies > 0) parts.push(pluralize(t, language, "guests.summary.babies", babies));
+  if (pets > 0) parts.push(pluralize(t, language, "guests.summary.pets", pets));
+  return parts.join(", ");
 }
 
 const SearchBar = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { searchParams, setSearchParams, applySearch } = useSearch();
   const [datesOpen, setDatesOpen] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
@@ -78,15 +79,10 @@ const SearchBar = () => {
 
   const datesLabel =
     searchParams.checkIn && searchParams.checkOut
-      ? `${formatDateShort(searchParams.checkIn)} - ${formatDateShort(searchParams.checkOut)}`
+      ? `${formatDateShort(searchParams.checkIn, language)} - ${formatDateShort(searchParams.checkOut, language)}`
       : t("searchBar.dates");
 
-  const guestsLabel = formatGuestsSummary(
-    searchParams.adults,
-    searchParams.children,
-    searchParams.babies,
-    searchParams.pets
-  ) || t("searchBar.guests");
+  const guestsLabel = formatGuestsSummary(t, language, searchParams) || t("searchBar.guests");
 
   return (
     <form className="search-bar" onSubmit={handleSubmit}>
@@ -98,7 +94,7 @@ const SearchBar = () => {
             onChange={handleWhereChange}
             placeholder={t("searchBar.where")}
             className="search-input"
-            aria-label="Destination"
+            aria-label={t("searchBar.destination")}
           />
         </div>
         <div className="search-divider" />

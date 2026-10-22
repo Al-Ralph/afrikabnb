@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { formatPrice } from "../../utils/format";
+import { StarIcon } from "../Icons";
 import "./MapListingList.css";
 
 // Liste compacte synchronisée avec la carte (survol/focus = mise en avant du marqueur).
@@ -32,7 +33,7 @@ const MapListingList = ({ listings, selectedId, onSelect, defaultCurrency }) => 
                   <strong>{formatPrice(listing.price, currency, language)}</strong> / {t("common.night")}
                   {listing.rating != null && (
                     <span className="map-list-rating">
-                      {" · ★ "}
+                      <StarIcon size={12} />
                       {Number(listing.rating).toFixed(1)}
                       {listing.reviewCount > 0 && ` (${listing.reviewCount})`}
                     </span>

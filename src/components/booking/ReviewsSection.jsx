@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { api } from "../../api/client";
 import { formatDay } from "../../utils/format";
+import { StarIcon } from "../Icons";
+import { ListSkeleton } from "../Skeleton";
 import "./ReviewsSection.css";
 
 export const REVIEWS_PAGE_SIZE = 5;
@@ -10,8 +12,14 @@ const Stars = ({ rating, label }) => {
   const value = Math.round(Number(rating) || 0);
   return (
     <span className="reviews-stars" role="img" aria-label={label}>
-      {"★".repeat(value)}
-      <span className="reviews-stars-empty">{"★".repeat(Math.max(0, 5 - value))}</span>
+      {Array.from({ length: value }, (_, i) => (
+        <StarIcon key={i} size={14} />
+      ))}
+      <span className="reviews-stars-empty">
+        {Array.from({ length: Math.max(0, 5 - value) }, (_, i) => (
+          <StarIcon key={i} size={14} />
+        ))}
+      </span>
     </span>
   );
 };
@@ -64,13 +72,12 @@ const ReviewsSection = ({ listingId }) => {
   return (
     <section className="reviews" aria-labelledby="reviews-title">
       <h2 id="reviews-title" className="reviews-title">
-        {average != null && total > 0 ? `★ ${Number(average).toFixed(1)} · ` : ""}
+        {average != null && total > 0 && <StarIcon size={18} />}
+        {average != null && total > 0 ? `${Number(average).toFixed(1)} · ` : ""}
         {total} {total > 1 ? t("reviews.reviewsPlural") : t("reviews.reviewSingular")}
       </h2>
       {status === "loading" && (
-        <p className="reviews-muted" role="status">
-          {t("reviews.loading")}
-        </p>
+        <ListSkeleton label={t("reviews.loading")} rows={2} media={false} />
       )}
       {status === "error" && (
         <p className="reviews-muted" role="alert">

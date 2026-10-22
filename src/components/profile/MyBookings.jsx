@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { api, toIsoDay } from "../../api/client";
 import BookingItem from "./BookingItem";
+import EmptyState from "../EmptyState";
+import { ListSkeleton } from "../Skeleton";
 
 const GROUPS = ["upcoming", "past", "cancelled"];
 
@@ -53,26 +55,28 @@ const MyBookings = () => {
 
   let content;
   if (loading) {
-    content = (
-      <div className="account-state" role="status" aria-live="polite">
-        <div className="account-spinner" aria-hidden="true" />
-        <p>{t("bookings.loading")}</p>
-      </div>
-    );
+    content = <ListSkeleton label={t("bookings.loading")} rows={2} />;
   } else if (error) {
     content = (
-      <div className="account-state" role="alert">
+      <EmptyState
+        compact
+        icon="calendar"
+        tone="danger"
+        role="alert"
+        action={
+          <button type="button" className="account-btn" onClick={load}>
+            {t("bookings.retry")}
+          </button>
+        }
+      >
         <p>{t("bookings.error")}</p>
-        <button type="button" className="account-btn" onClick={load}>
-          {t("bookings.retry")}
-        </button>
-      </div>
+      </EmptyState>
     );
   } else if (bookings.length === 0) {
     content = (
-      <div className="account-state">
+      <EmptyState compact icon="calendar">
         <p>{t("bookings.empty")}</p>
-      </div>
+      </EmptyState>
     );
   } else {
     content = GROUPS.map((group) => (

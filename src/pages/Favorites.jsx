@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { useFavorites } from "../context/FavoritesContext";
 import PropertyCard from "../components/PropertyCard";
 import Footer from "../components/Footer";
+import EmptyState from "../components/EmptyState";
+import { ListingGridSkeleton } from "../components/Skeleton";
 import "./Account.css";
 
 const Favorites = () => {
@@ -14,38 +16,49 @@ const Favorites = () => {
 
   let content;
   if (authLoading || (user && loading && favorites.length === 0)) {
-    content = (
-      <div className="account-state" role="status" aria-live="polite">
-        <div className="account-spinner" aria-hidden="true" />
-        <p>{t("favorites.loading")}</p>
-      </div>
-    );
+    content = <ListingGridSkeleton label={t("favorites.loading")} count={4} />;
   } else if (!user) {
     content = (
-      <div className="account-state">
+      <EmptyState
+        icon="heart"
+        title={t("ui.favorites.loginTitle")}
+        action={
+          <button type="button" className="btn btn--primary" onClick={openAuth}>
+            {t("favorites.loginBtn")}
+          </button>
+        }
+      >
         <p>{t("favorites.loginRequired")}</p>
-        <button type="button" className="account-btn account-btn-primary" onClick={openAuth}>
-          {t("favorites.loginBtn")}
-        </button>
-      </div>
+      </EmptyState>
     );
   } else if (error && favorites.length === 0) {
     content = (
-      <div className="account-state" role="alert">
+      <EmptyState
+        icon="heart"
+        tone="danger"
+        role="alert"
+        action={
+          <button type="button" className="btn btn--secondary" onClick={reload}>
+            {t("favorites.retry")}
+          </button>
+        }
+      >
         <p>{t("favorites.error")}</p>
-        <button type="button" className="account-btn" onClick={reload}>
-          {t("favorites.retry")}
-        </button>
-      </div>
+      </EmptyState>
     );
   } else if (favorites.length === 0) {
     content = (
-      <div className="account-state">
+      <EmptyState
+        icon="heart"
+        title={t("ui.favorites.emptyTitle")}
+        action={
+          <Link to="/" className="btn btn--primary">
+            {t("favorites.emptyCta")}
+          </Link>
+        }
+      >
         <p>{t("favorites.empty")}</p>
-        <Link to="/" className="account-btn account-btn-primary">
-          {t("favorites.emptyCta")}
-        </Link>
-      </div>
+      </EmptyState>
     );
   } else {
     content = (
