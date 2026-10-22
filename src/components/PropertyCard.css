@@ -173,3 +173,87 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 4px #0b5d46;
 }
+
+/* --- Mini-carrousel de photos (annonces à plusieurs photos) ------------------- */
+/* Calque de la taille de la photo (4:3) : flèches et points au-dessus du lien. */
+.property-card-photos {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  aspect-ratio: 4 / 3;
+  pointer-events: none;
+}
+
+.property-card-arrow {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #121a17;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition: opacity var(--dur) var(--ease-std), transform var(--dur-fast) var(--ease-std);
+}
+
+.property-card-arrow--prev {
+  left: var(--space-3);
+}
+
+.property-card-arrow--next {
+  right: var(--space-3);
+}
+
+.property-card:hover .property-card-arrow,
+.property-card-arrow:focus-visible {
+  opacity: 1;
+}
+
+.property-card-arrow:hover {
+  transform: translateY(-50%) scale(1.06);
+}
+
+.property-card-arrow:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px #0b5d46;
+}
+
+/* Appareils tactiles : on glisse, pas de flèches. */
+@media (hover: none) {
+  .property-card-arrow {
+    display: none;
+  }
+}
+
+.property-card-dots {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  display: flex;
+  gap: 5px;
+  transform: translateX(-50%);
+}
+
+.property-card-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+  transition: background-color var(--dur) var(--ease-std), transform var(--dur) var(--ease-out);
+}
+
+.property-card-dots span.is-active {
+  background: #ffffff;
+  transform: scale(1.2);
+}

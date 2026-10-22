@@ -106,6 +106,67 @@ if (Number.isNaN(trustProxy) || trustProxy < 0) {
   errors.push("TRUST_PROXY doit être un entier >= 0 (nombre de proxys devant l'API).");
 }
 
+const isHttpUrl = (url) => {
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+};
+const stripSlash = (url) => url.replace(/\/+$/, "");
+
+// URL publique du frontend (liens des emails : réinitialisation du mot de passe, réservations).
+let appUrl = process.env.APP_URL || "";
+if (!appUrl) {
+  if (isProduction) errors.push("APP_URL est obligatoire en production (URL publique du frontend, liens des emails).");
+  else appUrl = "http://localhost:3000";
+} else if (!isHttpUrl(appUrl)) {
+  errors.push("APP_URL doit être une URL http(s) (ex. https://afrikabnb.example).");
+}
+appUrl = stripSlash(appUrl);
+
+// URL publique de l'API (URL des images du stockage « local »).
+let publicApiUrl = process.env.PUBLIC_API_URL || `http://localhost:${Number(process.env.PORT) || 4000}`;
+if (!isHttpUrl(publicApiUrl)) errors.push("PUBLIC_API_URL doit être une URL http(s).");
+publicApiUrl = stripSlash(publicApiUrl);
+
+// Stockage des photos : "supabase" (Supabase Storage) ou "local" (dossier backend/uploads).
+// Défaut : local en développement, supabase en production. « local » est refusé en production
+// (disque éphémère des conteneurs, pas de CDN) sauf STORAGE_ALLOW_LOCAL=1.
+const storageDriver = (process.env.STORAGE_DRIVER || (isProduction ? "supabase" : "local")).toLowerCase();
+const storageAllowLocal = process.env.STORAGE_ALLOW_LOCAL === "1";
+const supabaseUrl = stripSlash(process.env.SUPABASE_URL || "");
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || "listing-images";
+if (!["local", "supabase"].includes(storageDriver)) {
+  errors.push('STORAGE_DRIVER doit valoir "local" ou "supabase".');
+} else if (storageDriver === "local" && isProduction && !storageAllowLocal) {
+  errors.push(
+    'STORAGE_DRIVER=local refusé en production (fichiers perdus au redéploiement). Utiliser "supabase", ou forcer avec STORAGE_ALLOW_LOCAL=1 (volume persistant).'
+  );
+} else if (storageDriver === "supabase") {
+  const msgs = [];
+  if (!/^https:\/\/[^/]+$/.test(supabaseUrl)) msgs.push("SUPABASE_URL (https://<ref>.supabase.co)");
+  if (!supabaseServiceRoleKey) msgs.push("SUPABASE_SERVICE_ROLE_KEY (clé service_role / secret, serveur uniquement)");
+  if (!/^[a-z0-9][a-z0-9._-]{1,62}$/.test(storageBucket)) msgs.push("SUPABASE_STORAGE_BUCKET valide");
+  if (msgs.length) errors.push(`STORAGE_DRIVER=supabase : renseigner ${msgs.join(", ")}.`);
+}
+
+// Emails : "resend" (API HTTP Resend) ou "console" (journalise le contenu, n'envoie rien).
+// Défaut : console en développement, resend en production. Sans clé en production : l'API
+// démarre quand même, chaque envoi est journalisé en erreur et ignoré.
+const emailDriver = (process.env.EMAIL_DRIVER || (isProduction ? "resend" : "console")).toLowerCase();
+const resendApiKey = process.env.RESEND_API_KEY || "";
+const emailFrom = process.env.EMAIL_FROM || "AfrikaBnB <onboarding@resend.dev>";
+if (!["console", "resend"].includes(emailDriver)) {
+  errors.push('EMAIL_DRIVER doit valoir "console" ou "resend".');
+} else if (emailDriver === "resend" && !resendApiKey) {
+  warnings.push("EMAIL_DRIVER=resend sans RESEND_API_KEY : aucun email ne sera envoyé (erreur journalisée à chaque envoi).");
+}
+if (isProduction && emailDriver === "console") {
+  warnings.push("EMAIL_DRIVER=console en production : aucun email n'est envoyé (contenu non journalisé).");
+}
+
 if (errors.length > 0) {
   for (const e of errors) console.error(`[config] ERREUR : ${e}`);
   console.error("[config] Démarrage refusé.");
@@ -122,6 +183,19 @@ export const config = Object.freeze({
   jwt: Object.freeze({
     secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+  }),
+  appUrl,
+  publicApiUrl,
+  storage: Object.freeze({
+    driver: storageDriver,
+    supabaseUrl,
+    supabaseServiceRoleKey,
+    bucket: storageBucket,
+  }),
+  email: Object.freeze({
+    driver: emailDriver,
+    resendApiKey,
+    from: emailFrom,
   }),
 });
 

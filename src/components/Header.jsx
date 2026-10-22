@@ -34,7 +34,7 @@ const Header = () => {
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
   const { t } = useLanguage();
-  const { user, logout, authOpen, openAuth, closeAuth } = useAuth();
+  const { user, logout, authOpen, authMode, openAuth, closeAuth } = useAuth();
   const { pathname } = useLocation();
   const overHero = pathname === "/";
 
@@ -70,6 +70,7 @@ const Header = () => {
   }, [pathname, user]);
 
   const closeMenu = () => setMenuOpen(false);
+  const isHost = user?.role === "HOST" || user?.role === "ADMIN";
 
   const menuLinks = (
     <>
@@ -77,8 +78,13 @@ const Header = () => {
         {t("header.map")}
       </Link>
       <Link to="/host" className="header-user-dropdown-item" onClick={closeMenu}>
-        {user ? t("header.hostSpace") : t("header.becomeHost")}
+        {!user ? t("header.becomeHost") : isHost ? t("menu.hostDashboard") : t("header.hostSpace")}
       </Link>
+      {user?.role === "ADMIN" && (
+        <Link to="/admin" className="header-user-dropdown-item" onClick={closeMenu}>
+          {t("menu.admin")}
+        </Link>
+      )}
     </>
   );
 
@@ -111,7 +117,7 @@ const Header = () => {
             className="header-user-dropdown-item header-user-dropdown-strong"
             onClick={() => {
               closeMenu();
-              openAuth();
+              openAuth("login");
             }}
           >
             {t("header.login")}
@@ -156,7 +162,7 @@ const Header = () => {
               </div>
             ) : (
               <>
-                <button type="button" className="header-btn header-btn-outline header-login-btn" onClick={openAuth}>
+                <button type="button" className="header-btn header-btn-outline header-login-btn" onClick={() => openAuth("login")}>
                   {t("header.login")}
                 </button>
                 <div className="header-user-group header-user-menu-wrap" ref={menuRef}>
@@ -171,7 +177,7 @@ const Header = () => {
                   >
                     <MenuIcon />
                   </button>
-                  <button type="button" className="header-icon-btn header-icon-btn-user" aria-label={t("header.profile")} onClick={openAuth}>
+                  <button type="button" className="header-icon-btn header-icon-btn-user" aria-label={t("header.profile")} onClick={() => openAuth("login")}>
                     <UserIcon />
                   </button>
                   {dropdown}
@@ -181,7 +187,7 @@ const Header = () => {
           </nav>
         </div>
       </header>
-      <AuthModal isOpen={authOpen} onClose={closeAuth} />
+      <AuthModal isOpen={authOpen} onClose={closeAuth} initialMode={authMode} />
     </>
   );
 };

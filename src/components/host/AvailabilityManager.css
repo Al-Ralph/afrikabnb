@@ -1,0 +1,133 @@
+.availability {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.availability-select {
+  max-width: 420px;
+}
+
+.availability-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.availability-form,
+.availability-lists > section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.availability-lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.availability h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.availability-form p {
+  margin: 0;
+}
+
+.availability-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.availability .listing-form-field input[type="date"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.availability .listing-form-field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 1px var(--color-focus);
+}
+
+.availability-picker-toggle {
+  align-self: flex-start;
+}
+
+.availability-picker {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.availability-picker .date-picker-panel {
+  min-width: 0;
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+}
+
+.availability-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.availability-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.availability-item p {
+  margin: 0;
+}
+
+.availability-item--blocked {
+  border-left: 3px solid var(--color-border-strong);
+}
+
+.availability-range {
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .availability-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .availability-form,
+  .availability-lists > section {
+    padding: var(--space-4);
+  }
+
+  .availability-dates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

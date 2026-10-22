@@ -176,6 +176,23 @@
   text-decoration: underline;
 }
 
+.auth-modal-forgot {
+  align-self: flex-start;
+  min-height: 32px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.auth-modal-notice {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
 .auth-modal-link:hover {
   color: var(--color-primary-hover);
 }

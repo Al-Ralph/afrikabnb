@@ -5,6 +5,20 @@ import { averageRating, formatDay, todayDay } from "../../utils/booking.js";
 const authorSelect = { select: { id: true, name: true, avatar: true } };
 const reviewSelect = { id: true, rating: true, comment: true, createdAt: true, author: authorSelect };
 
+// Recalcule la note moyenne et le nombre d'avis d'une annonce (dans une transaction ayant
+// verrouillé la ligne Listing). Retourne { id, rating, reviewCount }.
+export async function recomputeListingRating(tx, listingId) {
+  const agg = await tx.review.aggregate({
+    where: { listingId },
+    _sum: { rating: true },
+    _count: { _all: true },
+  });
+  const reviewCount = agg._count._all;
+  const rating = averageRating(agg._sum.rating, reviewCount);
+  await tx.listing.update({ where: { id: listingId }, data: { rating, reviewCount } });
+  return { id: listingId, rating, reviewCount };
+}
+
 // GET /api/listings/:id/reviews?limit&offset
 export async function listForListing(req, res, next) {
   try {
@@ -70,18 +84,8 @@ export async function create(req, res, next) {
         },
         select: reviewSelect,
       });
-      const agg = await tx.review.aggregate({
-        where: { listingId: booking.listingId },
-        _sum: { rating: true },
-        _count: { _all: true },
-      });
-      const reviewCount = agg._count._all;
-      const listingRating = averageRating(agg._sum.rating, reviewCount);
-      await tx.listing.update({
-        where: { id: booking.listingId },
-        data: { rating: listingRating, reviewCount },
-      });
-      return { review, listing: { id: booking.listingId, rating: listingRating, reviewCount } };
+      const listing = await recomputeListingRating(tx, booking.listingId);
+      return { review, listing };
     });
     res.status(201).json({ ...result.review, listing: result.listing });
   } catch (err) {

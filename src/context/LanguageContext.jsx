@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { translations as baseTranslations, languageCodes, languageNames } from "./translations";
 import { designTranslations } from "./translations.design";
+import { travelerTranslations } from "./translations.traveler";
+import { hostTranslations } from "./translations.host";
 
 const STORAGE_KEY = "afrikabnb_lang";
 
@@ -16,8 +18,12 @@ export function mergeTranslations(base, extra) {
   return out;
 }
 
-// Calculé une fois au chargement : translations.js (prioritaire) + translations.design.js.
-const translations = mergeTranslations(baseTranslations, designTranslations);
+// Calculé une fois au chargement : translations.js (prioritaire), puis les fichiers
+// complémentaires (design, voyageur, hôte), chacun ne pouvant qu'ajouter des clés.
+const translations = [designTranslations, travelerTranslations, hostTranslations].reduce(
+  mergeTranslations,
+  baseTranslations
+);
 
 const LanguageContext = createContext(null);
 

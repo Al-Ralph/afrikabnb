@@ -9,6 +9,9 @@ import Icon, { StarIcon } from "../components/Icons";
 import CategoryIcon from "../components/CategoryIcons";
 import EmptyState from "../components/EmptyState";
 import { PropertySkeleton } from "../components/Skeleton";
+import PhotoGallery from "../components/listing/PhotoGallery";
+import AmenitiesSection from "../components/listing/AmenitiesSection";
+import { sortedImages } from "../utils/images";
 import "./PropertyDetails.css";
 
 const PropertyDetails = () => {
@@ -76,11 +79,13 @@ const PropertyDetails = () => {
     );
   }
 
-  const { location, title, rating, image, description, maxGuests, bedrooms, host, reviewCount, categoryId, acceptsPets } =
+  const { location, title, rating, description, maxGuests, bedrooms, host, reviewCount, categoryId, acceptsPets } =
     property;
   // Les annonces de démonstration sont exprimées en dollars ; l'API fournit toujours une devise.
   const currency = property.currency || (isDemo ? "USD" : "XOF");
   const hostName = host?.name;
+  // Réservation instantanée par défaut ; false = sur demande (l'hôte accepte sous 48 h).
+  const instant = property.instantBook !== false;
   const categoryLabel = categoryId ? t(`categories.${categoryId}`) : null;
   const reviewsWord = reviewCount > 1 ? t("reviews.reviewsPlural") : t("reviews.reviewSingular");
 
@@ -117,16 +122,19 @@ const PropertyDetails = () => {
               <Icon name="pin" size={16} />
               <span>{location}</span>
             </span>
+            {!isDemo && (
+              <span
+                className={`property-details-mode${instant ? " property-details-mode--instant" : ""}`}
+                title={instant ? t("listing.instantBookHint") : t("listing.onRequestHint")}
+              >
+                <Icon name={instant ? "bolt" : "clock"} size={16} />
+                <span>{instant ? t("listing.instantBook") : t("listing.onRequest")}</span>
+              </span>
+            )}
           </div>
         </header>
 
-        <figure className="property-details-image-wrap">
-          {image ? (
-            <img src={image} alt={title} className="property-details-image" fetchPriority="high" />
-          ) : (
-            <span className="property-details-image property-details-image--empty" />
-          )}
-        </figure>
+        <PhotoGallery images={sortedImages(property)} title={title} />
 
         <div className="property-details-layout">
           <div className="property-details-main">
@@ -165,6 +173,8 @@ const PropertyDetails = () => {
                 )}
               </ul>
             </section>
+
+            {!isDemo && <AmenitiesSection amenities={property.amenities} />}
 
             {hostName && (
               <section className="property-details-host" aria-label={t("ui.property.hostRole")}>

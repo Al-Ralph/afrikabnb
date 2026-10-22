@@ -3,8 +3,16 @@ import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { api } from "../../api/client";
 import { formatPrice, formatDay } from "../../utils/format";
+import { interpolate } from "../../utils/plural";
 import { apiErrorMessage } from "./errorMessage";
 import ReviewForm from "./ReviewForm";
+
+// Échéance de réponse de l'hôte (ISO) -> « 24 oct. 2026, 14:30 ».
+function formatDeadline(iso, language) {
+  const date = iso ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
 
 // kind : "upcoming" | "past" | "cancelled" ; today : "YYYY-MM-DD".
 const BookingItem = ({ booking, kind, today, onChange }) => {
@@ -19,7 +27,12 @@ const BookingItem = ({ booking, kind, today, onChange }) => {
   const listingId = booking.listingId || listing.id;
   const nights = Number(booking.nights) || 0;
   const guests = Number(booking.guests) || 0;
-  const canCancel = kind === "upcoming" && booking.status !== "CANCELLED" && booking.checkIn > today;
+  const status = booking.status;
+  const isPending = status === "PENDING";
+  // Annulable : demande en attente ou réservation confirmée, avant l'arrivée.
+  const canCancel =
+    kind === "upcoming" && (isPending || status === "CONFIRMED") && booking.checkIn > today;
+  const deadline = isPending ? formatDeadline(booking.expiresAt, language) : "";
   const canReview =
     kind === "past" &&
     booking.status === "CONFIRMED" &&
@@ -57,8 +70,8 @@ const BookingItem = ({ booking, kind, today, onChange }) => {
           <h4 className="booking-item-title">
             <Link to={`/property/${listingId}`}>{listing.title}</Link>
           </h4>
-          <span className={`booking-status booking-status--${String(booking.status).toLowerCase()}`}>
-            {t(`bookings.status${booking.status}`)}
+          <span className={`booking-status booking-status--${String(status).toLowerCase()}`}>
+            {t(`bookingStatus.${status}`)}
           </span>
         </div>
         {listing.location && <p className="booking-item-location">{listing.location}</p>}
@@ -71,6 +84,11 @@ const BookingItem = ({ booking, kind, today, onChange }) => {
           <span>{t("bookings.total")}</span>{" "}
           <strong>{formatPrice(booking.totalPrice, booking.currency || listing.currency, language)}</strong>
         </p>
+        {isPending && deadline && (
+          <p className="booking-item-hint">{interpolate(t("bookingStatus.pendingUntil"), { date: deadline })}</p>
+        )}
+        {status === "DECLINED" && <p className="booking-item-hint">{t("bookingStatus.declinedHint")}</p>}
+        {status === "EXPIRED" && <p className="booking-item-hint">{t("bookingStatus.expiredHint")}</p>}
         {booking.hasReview && !notice && <p className="booking-item-reviewed">{t("bookings.reviewed")}</p>}
         {notice && <p className="account-alert account-alert-success" role="status">{notice}</p>}
         {error && <p className="account-alert account-alert-error" role="alert">{error}</p>}
@@ -78,13 +96,15 @@ const BookingItem = ({ booking, kind, today, onChange }) => {
         {canCancel && !confirming && (
           <div className="profile-actions">
             <button type="button" className="account-btn account-btn-danger" onClick={() => setConfirming(true)}>
-              {t("bookings.cancel")}
+              {isPending ? t("bookingStatus.cancelRequest") : t("bookings.cancel")}
             </button>
           </div>
         )}
         {canCancel && confirming && (
           <div className="booking-confirm" role="group" aria-labelledby={`booking-confirm-${booking.id}`}>
-            <p id={`booking-confirm-${booking.id}`}>{t("bookings.cancelConfirm")}</p>
+            <p id={`booking-confirm-${booking.id}`}>
+              {isPending ? t("bookingStatus.cancelRequestConfirm") : t("bookings.cancelConfirm")}
+            </p>
             <div className="profile-actions">
               <button type="button" className="account-btn account-btn-danger" onClick={handleCancel} disabled={cancelling}>
                 {cancelling ? t("bookings.cancelling") : t("bookings.cancelYes")}

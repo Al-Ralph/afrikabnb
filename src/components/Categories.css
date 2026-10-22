@@ -132,9 +132,41 @@
   background: var(--color-surface-2);
 }
 
+.categories-filters-btn--active {
+  position: relative;
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.categories-filters-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 600px) {
   .categories {
     gap: var(--space-2);
+  }
+
+  /* Pastille du compteur sur le coin du bouton rond. */
+  .categories-filters-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    box-shadow: 0 0 0 2px var(--color-bg);
   }
 
   .categories-filters-btn {
@@ -144,7 +176,7 @@
   }
 
   /* Libellé conservé pour les lecteurs d'écran, icône seule à l'écran. */
-  .categories-filters-btn span {
+  .categories-filters-btn span:not(.categories-filters-count) {
     position: absolute;
     width: 1px;
     height: 1px;

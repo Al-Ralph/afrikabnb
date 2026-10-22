@@ -3,6 +3,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useSearch } from "../context/SearchContext";
 import { categories } from "../data/listings";
 import CategoryIcon from "./CategoryIcons";
+import { pluralize } from "../utils/plural";
 import "./Categories.css";
 
 const FilterIcon = () => (
@@ -19,8 +20,9 @@ const FilterIcon = () => (
   </svg>
 );
 
-const Categories = () => {
-  const { t } = useLanguage();
+// `onOpenFilters` ouvre le panneau de filtres ; `activeFilters` = nombre de filtres appliqués.
+const Categories = ({ onOpenFilters, activeFilters = 0 }) => {
+  const { t, language } = useLanguage();
   const { appliedSearch, toggleCategory } = useSearch();
   return (
     <div className="categories">
@@ -41,9 +43,22 @@ const Categories = () => {
           );
         })}
       </div>
-      <button type="button" className="categories-filters-btn">
+      <button
+        type="button"
+        className={`categories-filters-btn${activeFilters > 0 ? " categories-filters-btn--active" : ""}`}
+        onClick={onOpenFilters}
+        aria-haspopup="dialog"
+      >
         <FilterIcon />
         <span>{t("categories.filters")}</span>
+        {activeFilters > 0 && (
+          <>
+            <span className="categories-filters-count" aria-hidden="true">
+              {activeFilters}
+            </span>
+            <span className="sr-only">{`, ${pluralize(t, language, "filters.activeCount", activeFilters)}`}</span>
+          </>
+        )}
       </button>
     </div>
   );

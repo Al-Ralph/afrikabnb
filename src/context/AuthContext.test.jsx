@@ -124,3 +124,21 @@ describe("AuthContext", () => {
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 });
+
+describe("AuthContext — auth modal mode", () => {
+  test("openAuth(mode) and the open-auth event (detail.mode) choose the screen; default is login", () => {
+    localStorage.removeItem("afrikabnb_token");
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    act(() => result.current.openAuth("forgot"));
+    expect(result.current.authOpen).toBe(true);
+    expect(result.current.authMode).toBe("forgot");
+    act(() => result.current.closeAuth());
+    act(() => {
+      window.dispatchEvent(new CustomEvent(OPEN_AUTH_EVENT, { detail: { mode: "register" } }));
+    });
+    expect(result.current.authMode).toBe("register");
+    // Appelé comme gestionnaire de clic (reçoit un événement) : écran de connexion.
+    act(() => result.current.openAuth({ type: "click" }));
+    expect(result.current.authMode).toBe("login");
+  });
+});
