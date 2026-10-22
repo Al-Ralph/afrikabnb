@@ -26,13 +26,37 @@ export const stayOrderRefinement = [
   { message: "checkOut doit être postérieur à checkIn", path: ["checkOut"] },
 ];
 
-// Construit le `where` Prisma à partir des filtres validés.
-export function buildListingWhere(query) {
-  const { where: search, q, categoryId, minPrice, maxPrice, pets, guests, checkIn, checkOut } = query;
+// Texte recherché (`q` est un alias de `where`), ou undefined.
+export function searchText(query) {
+  return query.where || query.q || undefined;
+}
+
+// Échappe les jokers de LIKE (\ % _) pour chercher le texte tel quel.
+export function escapeLike(text) {
+  return text.replace(/[\\%_]/g, "\\$&");
+}
+
+// Ids des annonces dont le titre ou la ville contient le texte, sans tenir compte de la casse
+// ni des accents ("Lome" trouve "Lomé"). Prisma ne sait pas faire `unaccent` : requête brute
+// paramétrée (extension unaccent activée par la migration 20261022120000_unaccent).
+export async function findListingIdsByText(prisma, text) {
+  const pattern = `%${escapeLike(text)}%`;
+  const rows = await prisma.$queryRaw`
+    SELECT "id" FROM "Listing"
+    WHERE unaccent(lower("title")) LIKE unaccent(lower(${pattern}))
+       OR unaccent(lower("location")) LIKE unaccent(lower(${pattern}))`;
+  return rows.map((r) => r.id);
+}
+
+// Construit le `where` Prisma à partir des filtres validés. `textMatchIds` : résultat de
+// findListingIdsByText ; sans lui, repli sur ILIKE (insensible à la casse, pas aux accents).
+export function buildListingWhere(query, { textMatchIds } = {}) {
+  const { categoryId, minPrice, maxPrice, pets, guests, checkIn, checkOut } = query;
   const where = {};
-  const text = search ?? q;
-  // PostgreSQL : `contains` (LIKE) est sensible à la casse, `mode: "insensitive"` utilise ILIKE.
-  if (text) {
+  const text = searchText(query);
+  if (text && textMatchIds) {
+    where.id = { in: textMatchIds };
+  } else if (text) {
     where.OR = [
       { location: { contains: text, mode: "insensitive" } },
       { title: { contains: text, mode: "insensitive" } },

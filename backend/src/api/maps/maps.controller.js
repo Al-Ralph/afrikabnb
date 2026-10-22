@@ -1,6 +1,6 @@
 import axios from "axios";
 import prisma from "../../config/db.js";
-import { buildListingWhere } from "../listings/listings.query.js";
+import { buildListingWhere, findListingIdsByText, searchText } from "../listings/listings.query.js";
 
 const nominatim = axios.create({
   baseURL: "https://nominatim.openstreetmap.org",
@@ -57,9 +57,11 @@ export async function reverseGeocode(req, res, next) {
 export async function listingsInBounds(req, res, next) {
   try {
     const { neLat, neLng, swLat, swLng } = req.query;
+    const text = searchText(req.query);
+    const textMatchIds = text ? await findListingIdsByText(prisma, text) : undefined;
     const listings = await prisma.listing.findMany({
       where: {
-        ...buildListingWhere(req.query),
+        ...buildListingWhere(req.query, { textMatchIds }),
         latitude: { gte: Math.min(neLat, swLat), lte: Math.max(neLat, swLat) },
         longitude: { gte: Math.min(neLng, swLng), lte: Math.max(neLng, swLng) },
       },
