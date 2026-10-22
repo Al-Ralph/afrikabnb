@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
+import Icon from "./Icons";
 import "./AuthModal.css";
 
 const AuthModal = ({ isOpen, onClose }) => {
@@ -83,7 +84,7 @@ const AuthModal = ({ isOpen, onClose }) => {
           aria-label={t("auth.close")}
           ref={closeBtnRef}
         >
-          ×
+          <Icon name="close" size={18} />
         </button>
         <h2 id="auth-modal-title" className="auth-modal-title">
           {mode === "login" ? t("auth.loginTitle") : t("auth.registerTitle")}

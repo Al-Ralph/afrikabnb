@@ -85,25 +85,25 @@ describe("SearchBar", () => {
     renderBar();
     fireEvent.click(screen.getAllByRole("button", { expanded: false })[0]);
     fireEvent.click(screen.getByText("pick-dates"));
-    expect(screen.getByText("5 Jan - 12 Jan")).toBeInTheDocument();
+    expect(screen.getByText("5 janv. - 12 janv.")).toBeInTheDocument();
   });
 
   test("guests panel opens and increments adults, label shows singular then plural", () => {
     renderBar();
     const toggles = screen.getAllByRole("button", { expanded: false });
     fireEvent.click(toggles[1]);
-    fireEvent.click(screen.getByLabelText("Plus de Adultes"));
+    fireEvent.click(screen.getByLabelText("Augmenter : Adultes"));
     expect(screen.getByText("1 adulte")).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("Plus de Adultes"));
+    fireEvent.click(screen.getByLabelText("Augmenter : Adultes"));
     expect(screen.getByText("2 adultes")).toBeInTheDocument();
   });
 
   test("guest summary combines categories", () => {
     renderBar();
     fireEvent.click(screen.getAllByRole("button", { expanded: false })[1]);
-    fireEvent.click(screen.getByLabelText("Plus de Adultes"));
-    fireEvent.click(screen.getByLabelText("Plus de Enfants"));
-    fireEvent.click(screen.getByLabelText("Plus de Animaux de compagnie"));
+    fireEvent.click(screen.getByLabelText("Augmenter : Adultes"));
+    fireEvent.click(screen.getByLabelText("Augmenter : Enfants"));
+    fireEvent.click(screen.getByLabelText("Augmenter : Animaux de compagnie"));
     expect(screen.getByText("1 adulte, 1 enfant, 1 animal")).toBeInTheDocument();
   });
 
@@ -129,5 +129,19 @@ describe("SearchBar", () => {
     fireEvent.click(screen.getAllByRole("button", { expanded: false })[1]);
     fireEvent.click(screen.getByRole("button", { name: /Rechercher/i }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  test("English: labels, date order and singular/plural summary", () => {
+    localStorage.setItem("afrikabnb_lang", "en");
+    renderBar();
+    fireEvent.click(screen.getAllByRole("button", { expanded: false })[0]);
+    fireEvent.click(screen.getByText("pick-dates"));
+    expect(screen.getByText("Jan 5 - Jan 12")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { expanded: false })[0]);
+    fireEvent.click(screen.getByLabelText("Increase: Adults"));
+    expect(screen.getByText("1 adult")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Increase: Adults"));
+    fireEvent.click(screen.getByLabelText("Increase: Children"));
+    expect(screen.getByText("2 adults, 1 child")).toBeInTheDocument();
   });
 });

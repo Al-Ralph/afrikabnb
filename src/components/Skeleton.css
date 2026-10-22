@@ -1,0 +1,175 @@
+/* Squelettes : aplat tonal + reflet discret (coupé si prefers-reduced-motion). */
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--skeleton-base);
+  border-radius: var(--radius-xs);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, var(--skeleton-shine) 50%, transparent 100%);
+  animation: skeleton-shimmer 1.6s var(--ease-std) infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    display: none;
+    animation: none;
+  }
+}
+
+.loading-region {
+  width: 100%;
+}
+
+.skeleton-line {
+  height: 12px;
+  margin-top: var(--space-3);
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-line--lg {
+  height: 16px;
+}
+
+.skeleton-line--title {
+  height: 36px;
+  margin-top: var(--space-4);
+  border-radius: var(--radius-sm);
+}
+
+/* Grille d'annonces : mêmes proportions que PropertyCard */
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-7) var(--space-5);
+}
+
+.skeleton-card-media {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+}
+
+/* Lignes */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-row {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.skeleton-row-media {
+  width: 132px;
+  aspect-ratio: 4 / 3;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Fiche logement */
+.skeleton-property-media {
+  margin-top: var(--space-5);
+  aspect-ratio: 16 / 8;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-property-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+}
+
+.skeleton-property-facts {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.skeleton-chip {
+  width: 120px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-property-aside {
+  height: 320px;
+  border-radius: var(--radius-lg);
+}
+
+/* Profil */
+.skeleton-profile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.skeleton-panel {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.skeleton-field {
+  margin-top: var(--space-4);
+}
+
+.skeleton-input {
+  height: 44px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-button {
+  width: 140px;
+  height: 44px;
+  margin-top: var(--space-5);
+  border-radius: var(--radius-pill);
+}
+
+@media (max-width: 900px) {
+  .skeleton-property-layout,
+  .skeleton-profile {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .skeleton-property-aside {
+    height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .skeleton-row-media {
+    width: 96px;
+  }
+
+  .skeleton-property-media {
+    aspect-ratio: 4 / 3;
+  }
+
+  .skeleton-chip {
+    width: 30%;
+  }
+}

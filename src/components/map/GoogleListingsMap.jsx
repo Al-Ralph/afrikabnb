@@ -4,6 +4,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { api } from "../../api/client";
 import { formatPrice } from "../../utils/format";
 import MapListingList from "./MapListingList";
+import Icon from "../Icons";
 import "./GoogleListingsMap.css";
 
 // Afrique de l'Ouest, centrée sur Lomé.
@@ -14,7 +15,7 @@ const IDLE_DEBOUNCE_MS = 300;
 // Marqueur « pastille de prix » dessiné en SVG (pas de dépendance ni de mapId requis).
 function priceIcon(g, text, active) {
   const width = Math.max(56, text.length * 8 + 20);
-  const fill = active ? "#222222" : "#ffffff";
+  const fill = active ? "#0b5d46" : "#ffffff";
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="30">` +
     `<rect x="1" y="1" width="${width - 2}" height="28" rx="14" fill="${fill}" stroke="#222222" stroke-opacity="0.25"/>` +
@@ -173,7 +174,7 @@ const GoogleListingsMap = ({ filters }) => {
               onClick={() => setSelectedId(null)}
               aria-label={t("map.closePreview")}
             >
-              ×
+              <Icon name="close" size={18} />
             </button>
             {selected.image && <img src={selected.image} alt="" className="gmap-preview-image" />}
             <div className="gmap-preview-body">

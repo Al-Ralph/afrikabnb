@@ -1,7 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { translations, languageCodes, languageNames } from "./translations";
+import { translations as baseTranslations, languageCodes, languageNames } from "./translations";
+import { designTranslations } from "./translations.design";
 
 const STORAGE_KEY = "afrikabnb_lang";
+
+const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+// Fusion profonde : `extra` complète `base` sans jamais écraser une clé existante de `base`.
+export function mergeTranslations(base, extra) {
+  const out = { ...base };
+  for (const [key, value] of Object.entries(extra || {})) {
+    if (!(key in out)) out[key] = value;
+    else if (isPlainObject(out[key]) && isPlainObject(value)) out[key] = mergeTranslations(out[key], value);
+  }
+  return out;
+}
+
+// Calculé une fois au chargement : translations.js (prioritaire) + translations.design.js.
+const translations = mergeTranslations(baseTranslations, designTranslations);
 
 const LanguageContext = createContext(null);
 
