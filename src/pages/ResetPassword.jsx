@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
@@ -19,13 +19,24 @@ const ResetPassword = () => {
   const { t } = useLanguage();
   const { logout, openAuth } = useAuth();
   const [params] = useSearchParams();
-  const token = params.get("token") || "";
+  // Le jeton est gardé en mémoire puis retiré de la barre d'adresse (historique, captures, Referer).
+  const tokenRef = useRef(params.get("token") || "");
+  const token = tokenRef.current;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [fieldError, setFieldError] = useState({});
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(token ? "form" : "missing");
+
+  useEffect(() => {
+    window.history.replaceState(null, "", "/reinitialiser-mot-de-passe");
+    const meta = document.createElement("meta");
+    meta.name = "referrer";
+    meta.content = "no-referrer";
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
 
   const validate = () => {
     const errors = {};

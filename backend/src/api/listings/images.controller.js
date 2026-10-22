@@ -8,8 +8,10 @@ import { imagesInclude } from "./listings.serializers.js";
 
 const MAX_DIMENSION = 1600;
 const WEBP_QUALITY = 80;
-// Garde-fou contre les « bombes de décompression » (≈ 8000 × 5000 px).
-const MAX_INPUT_PIXELS = 40_000_000;
+// Garde-fou contre les « bombes de décompression » (≈ 6000 × 4000 px).
+const MAX_INPUT_PIXELS = 25_000_000;
+// Un seul thread libvips : borne le CPU consommé par les envois simultanés.
+sharp.concurrency(1);
 
 // Listing.imageUrl = URL de la première image (couverture), ou null sans image.
 // À appeler dans la transaction qui modifie les images.

@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   PENDING_TTL_MS,
+  MAX_PENDING_PER_GUEST,
+  MAX_REQUEST_NIGHTS,
+  activePendingWhere,
+  blockingBookingWhere,
   effectiveStatus,
   findStayConflict,
   isBlocking,
@@ -70,4 +74,17 @@ test("findStayConflict : réservations bloquantes et périodes bloquées, interv
   assert.equal(findStayConflict({ checkIn: "2026-11-01", checkOut: "2026-11-05", blockedPeriods: [blocked], now }), null);
   // Arrivée le jour où finit le blocage
   assert.equal(findStayConflict({ checkIn: "2026-11-08", checkOut: "2026-11-10", blockedPeriods: [blocked], now }), null);
+});
+
+test("activePendingWhere : demandes PENDING non expirées, réutilisé par blockingBookingWhere", () => {
+  const where = activePendingWhere(now);
+  assert.equal(where.status, "PENDING");
+  assert.equal(where.createdAt.gt.getTime(), now.getTime() - PENDING_TTL_MS);
+  assert.equal(where.checkIn.gte.toISOString(), "2026-10-22T00:00:00.000Z");
+  assert.deepEqual(blockingBookingWhere(now).OR, [{ status: "CONFIRMED" }, where]);
+});
+
+test("quotas anti-abus des demandes", () => {
+  assert.equal(MAX_PENDING_PER_GUEST, 3);
+  assert.equal(MAX_REQUEST_NIGHTS, 60);
 });

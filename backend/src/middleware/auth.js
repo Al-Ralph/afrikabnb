@@ -43,24 +43,26 @@ export const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Contrôle léger (sans base) de la présence et de la signature du token : à placer avant un
-// traitement coûteux (téléversement), authenticateToken complétant ensuite la vérification.
-export const requireValidToken = (req, res, next) => {
-  const { payload, status, error } = checkToken(req);
-  if (!payload) return res.status(status).json({ error });
-  next();
-};
-
-// Authentification facultative : si un token valide est fourni, req.userId est renseigné
-// (sans requête en base). Token absent, invalide ou expiré : la requête continue en anonyme.
-export const optionalAuth = (req, res, next) => {
+// Authentification facultative : si un token valide ET non révoqué est fourni, req.userId est
+// renseigné (l'utilisateur est relu en base). Token absent, invalide, expiré ou révoqué, ou
+// utilisateur inexistant : la requête continue en anonyme, sans erreur.
+export const optionalAuth = async (req, res, next) => {
   const token = bearerToken(req);
   if (token) {
     try {
       const payload = verifyToken(token);
-      if (typeof payload.userId === "string") req.userId = payload.userId;
-    } catch {
-      // Token invalide : traité comme une requête anonyme.
+      if (typeof payload.userId === "string") {
+        const user = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: { id: true, passwordChangedAt: true },
+        });
+        if (user && !isTokenRevokedByPasswordChange(payload.iat, user.passwordChangedAt)) req.userId = user.id;
+      }
+    } catch (err) {
+      // Token invalide : anonyme. Panne de base : on ne dégrade pas en anonyme silencieusement.
+      if (err.name !== "JsonWebTokenError" && err.name !== "TokenExpiredError" && err.name !== "NotBeforeError") {
+        return next(err);
+      }
     }
   }
   next();

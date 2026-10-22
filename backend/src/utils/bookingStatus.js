@@ -11,6 +11,9 @@
 import { formatDay, todayDay } from "./booking.js";
 
 export const PENDING_TTL_MS = 48 * 60 * 60 * 1000;
+// Anti-abus : demandes en attente simultanées par voyageur, et durée maximale d'une demande.
+export const MAX_PENDING_PER_GUEST = 3;
+export const MAX_REQUEST_NIGHTS = 60;
 
 // Statuts qui bloquent les dates (PENDING uniquement tant qu'il n'est pas expiré).
 export const BLOCKING_STATUSES = ["PENDING", "CONFIRMED"];
@@ -46,18 +49,18 @@ export function isBlocking(booking, now = new Date()) {
   return BLOCKING_STATUSES.includes(effectiveStatus(booking, now));
 }
 
+// Filtre Prisma des demandes PENDING non expirées (complément de expiredPendingWhere).
+export function activePendingWhere(now = new Date()) {
+  return {
+    status: "PENDING",
+    createdAt: { gt: pendingCutoff(now) },
+    checkIn: { gte: new Date(`${todayDay(now)}T00:00:00.000Z`) },
+  };
+}
+
 // Filtre Prisma équivalent à isBlocking (à combiner avec un filtre de dates).
 export function blockingBookingWhere(now = new Date()) {
-  return {
-    OR: [
-      { status: "CONFIRMED" },
-      {
-        status: "PENDING",
-        createdAt: { gt: pendingCutoff(now) },
-        checkIn: { gte: new Date(`${todayDay(now)}T00:00:00.000Z`) },
-      },
-    ],
-  };
+  return { OR: [{ status: "CONFIRMED" }, activePendingWhere(now)] };
 }
 
 // Filtre Prisma des demandes PENDING expirées (balayage paresseux -> EXPIRED).
