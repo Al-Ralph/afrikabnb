@@ -1,0 +1,31 @@
+.placeholder-page {
+  min-height: calc(100vh - 70px);
+  padding: 48px 24px;
+}
+
+.placeholder-inner {
+  max-width: 500px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.placeholder-page h1 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  color: var(--color-text);
+}
+
+.placeholder-page p {
+  margin: 0 0 24px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.placeholder-back {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.placeholder-back:hover {
+  text-decoration: underline;
+}

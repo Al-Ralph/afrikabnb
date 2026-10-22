@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// PostgreSQL (Supabase en production). DATABASE_URL : pooler en mode transaction (port 6543,
+// ?pgbouncer=true&connection_limit=1) utilisé par l'API ; DIRECT_URL : connexion directe ou
+// session pooler (port 5432) utilisée par `prisma migrate` (DDL incompatibles avec le pooler).
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Longueurs VARCHAR alignées sur les schémas zod des routes (src/api/**/*.routes.js).
+
+enum Role {
+  GUEST
+  HOST
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique @db.VarChar(254)
+  password  String
+  name      String?  @db.VarChar(100)
+  avatar    String?  @db.VarChar(2048)
+  role      Role     @default(GUEST)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings  Listing[]
+  favorites Favorite[]
+  bookings  Booking[]
+  reviews   Review[]
+}
+
+model Listing {
+  id            String   @id @default(cuid())
+  title         String   @db.VarChar(200)
+  description   String?  @db.VarChar(5000)
+  location      String   @db.VarChar(200)
+  address       String?  @db.VarChar(300)
+  latitude      Float?
+  longitude     Float?
+  pricePerNight Decimal  @db.Decimal(10, 2)
+  currency      String   @default("XOF") @db.VarChar(3)
+  maxGuests     Int      @default(4)
+  bedrooms      Int      @default(1)
+  // Calculés à partir des avis (moyenne arrondie à 2 décimales) : jamais saisis par l'hôte.
+  rating        Decimal? @db.Decimal(3, 2)
+  reviewCount   Int      @default(0)
+  imageUrl      String?  @db.VarChar(2048)
+  categoryId    String?  @db.VarChar(50)
+  acceptsPets   Boolean  @default(false)
+  hostId        String
+  host          User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  favorites Favorite[]
+  bookings  Booking[]
+  reviews   Review[]
+
+  @@index([latitude, longitude])
+  @@index([hostId])
+  @@index([categoryId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([listingId])
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  listingId  String
+  guestId    String
+  listing    Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  guest      User          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  // Nuits occupées : [checkIn, checkOut[ (le jour du départ est libre pour une arrivée).
+  checkIn    DateTime      @db.Date
+  checkOut   DateTime      @db.Date
+  guests     Int
+  totalPrice Decimal       @db.Decimal(10, 2)
+  status     BookingStatus @default(CONFIRMED)
+  createdAt  DateTime      @default(now())
+
+  review Review?
+
+  @@index([listingId, checkIn, checkOut])
+  @@index([guestId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  listingId String
+  authorId  String
+  bookingId String   @unique
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String   @db.VarChar(1000)
+  createdAt DateTime @default(now())
+
+  @@index([listingId, createdAt])
+  @@index([authorId])
+}

@@ -1,0 +1,306 @@
+.host-page {
+  min-height: calc(100vh - 70px);
+  padding: 40px 32px 64px;
+}
+
+.host-page-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.host-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.host-page h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  color: var(--color-text);
+}
+
+.host-page-invite {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.host-page-invite p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.host-page-back {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.host-section h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+  color: var(--color-text);
+}
+
+.host-muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.host-notice,
+.host-alert {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+}
+
+.host-notice {
+  background: #e8f6ee;
+  color: #165c34;
+}
+
+.host-alert {
+  background: #fdecec;
+  color: #a61b1f;
+}
+
+.host-btn {
+  padding: 10px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.host-btn:hover:not(:disabled) {
+  border-color: var(--color-text);
+}
+
+.host-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.host-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.host-btn--primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.host-btn--primary:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+}
+
+.host-btn--danger {
+  border-color: #c4161c;
+  background: #c4161c;
+  color: #fff;
+}
+
+.host-btn--danger-outline {
+  border-color: #e5a3a5;
+  color: #a61b1f;
+}
+
+.host-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.host-confirm-prompt {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.host-listings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  gap: 16px;
+}
+
+.host-listing {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.host-listing-image-wrap {
+  flex-shrink: 0;
+}
+
+.host-listing-image {
+  display: block;
+  width: 140px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.host-listing-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.host-listing-body p {
+  margin: 0;
+}
+
+.host-listing-title {
+  font-weight: 700;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.host-listing-upcoming {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.host-listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.host-bookings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.host-booking {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.host-booking p {
+  margin: 0;
+}
+
+.host-booking-guest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.host-booking-name {
+  font-weight: 600;
+}
+
+.host-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.host-avatar--initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-weight: 700;
+}
+
+.host-booking-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.host-status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.host-status--confirmed {
+  background: #e8f6ee;
+  color: #165c34;
+}
+
+.host-status--pending {
+  background: #fff4e0;
+  color: #8a5a00;
+}
+
+.host-status--cancelled {
+  background: #f1f1f1;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 700px) {
+  .host-page {
+    padding: 24px 16px 48px;
+  }
+
+  .host-booking {
+    grid-template-columns: 1fr;
+  }
+
+  .host-booking-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 420px) {
+  .host-listing {
+    flex-direction: column;
+  }
+
+  .host-listing-image {
+    width: 100%;
+    height: 160px;
+  }
+}

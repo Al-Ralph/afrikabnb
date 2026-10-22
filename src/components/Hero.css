@@ -1,0 +1,130 @@
+.hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: min(78vh, 680px);
+  overflow: hidden;
+  color: #f6f1e8;
+  background:
+    radial-gradient(ellipse at 78% 22%, rgba(255, 168, 92, 0.35) 0%, transparent 52%),
+    radial-gradient(ellipse at 70% 40%, rgba(255, 90, 95, 0.25) 0%, transparent 58%),
+    radial-gradient(ellipse at 15% 85%, rgba(246, 241, 232, 0.08) 0%, transparent 50%),
+    linear-gradient(160deg, #3a4a63 0%, #2a3548 45%, #141b27 100%);
+}
+
+/* Horizon discret : rappelle un coucher de soleil sans image ni requête externe. */
+.hero::after {
+  content: "";
+  position: absolute;
+  right: -8%;
+  bottom: -38%;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 140, 90, 0.28) 0%, rgba(255, 90, 95, 0.08) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero__content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 760px;
+  padding: clamp(110px, 16vh, 160px) clamp(20px, 5vw, 72px) clamp(56px, 10vh, 96px);
+}
+
+.hero__brand {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 8.5vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  text-shadow: 0 2px 48px rgba(0, 0, 0, 0.45);
+}
+
+.hero__title {
+  margin: 0 0 0.9rem;
+  max-width: 20ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.8vw, 1.85rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.28;
+}
+
+.hero__lead {
+  margin: 0 0 1.6rem;
+  max-width: 40ch;
+  font-family: var(--font-body);
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  line-height: 1.6;
+  color: rgba(246, 241, 232, 0.78);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero__cta {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.95rem 1.7rem;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  background: #d93a40;
+  box-shadow: 0 12px 32px rgba(255, 90, 95, 0.3);
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+.hero__cta:hover {
+  background: #c22f35;
+  text-decoration: none;
+}
+
+.hero__cta--ghost {
+  background: transparent;
+  color: #f6f1e8;
+  border-color: rgba(246, 241, 232, 0.4);
+  box-shadow: none;
+}
+
+.hero__cta--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(246, 241, 232, 0.7);
+}
+
+.hero__cta:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .hero {
+    min-height: 520px;
+  }
+
+  .hero__content {
+    padding: 100px 16px 48px;
+  }
+
+  .hero__cta {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__cta {
+    transition: none;
+  }
+}
