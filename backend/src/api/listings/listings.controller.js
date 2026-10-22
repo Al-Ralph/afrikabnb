@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../../config/db.js";
 import { parseDay, todayDay } from "../../utils/booking.js";
-import { buildListingWhere } from "./listings.query.js";
+import { buildListingWhere, findListingIdsByText, searchText } from "./listings.query.js";
 import { hostSelect, listingToJson } from "./listings.serializers.js";
 import { bookingToJson, hostBookingInclude } from "../bookings/bookings.controller.js";
 
@@ -15,7 +15,9 @@ function listingInclude(userId) {
 export async function list(req, res, next) {
   try {
     const { limit, offset } = req.query;
-    const where = buildListingWhere(req.query);
+    const text = searchText(req.query);
+    const textMatchIds = text ? await findListingIdsByText(prisma, text) : undefined;
+    const where = buildListingWhere(req.query, { textMatchIds });
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
         where,

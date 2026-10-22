@@ -25,7 +25,7 @@ Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. P
 
 ## Fonctionnalités
 
-- **Recherche** : destination (texte recherché dans la ville et le titre), dates (exclut les logements déjà réservés), nombre de voyageurs (≤ capacité), animaux acceptés, catégories (Piscines, Bord de mer, Safari, Cabanes, Tendance, OMG!, Parcs nationaux, Îles, Luxe). Les critères sont synchronisés dans l’URL.
+- **Recherche** : destination (texte recherché dans la ville et le titre, insensible à la casse et aux accents), dates (exclut les logements déjà réservés), nombre de voyageurs (≤ capacité), animaux acceptés, catégories (Piscines, Bord de mer, Safari, Cabanes, Tendance, OMG!, Parcs nationaux, Îles, Luxe). Les critères sont synchronisés dans l’URL.
 - **Fiche logement** avec widget de réservation : dates déjà réservées bloquées, total calculé (nuits × prix), contrôle anti double-réservation dans une transaction côté serveur.
 - **Avis** : possibles après le séjour, un par réservation ; la note moyenne de l’annonce est calculée à partir des avis.
 - **Favoris** persistés en base.
@@ -120,7 +120,7 @@ Le seed est idempotent (relançable sans doublon) : 20 annonces réparties sur l
 | Commande | Où | Contenu |
 |---|---|---|
 | `npm test` | racine | Jest + Testing Library, mode watch (`CI=true npm test` pour une exécution unique) : 214 tests |
-| `npm test` | `backend/` | `node --test` : 13 tests sur la logique métier (nuits, prix, chevauchement de dates, moyenne des notes, filtres de recherche) |
+| `npm test` | `backend/` | `node --test` : 22 tests sur la logique métier (nuits, prix, chevauchement de dates, moyenne des notes, filtres de recherche) |
 | `npm run build` | racine | Build de production dans `build/` |
 | `npm audit` | `backend/` | 0 vulnérabilité au 21/10/2026 |
 

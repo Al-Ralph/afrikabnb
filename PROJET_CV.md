@@ -15,7 +15,7 @@ Application web full-stack de réservation de logements en Afrique (type Airbnb)
 
 • **Renforcé la sécurité** : JWT HS256 à secret obligatoire validé au démarrage, bcrypt (12 rounds), helmet, rate limiting, CORS restreint, erreurs 5xx masquées ; `npm audit` backend à 0 vulnérabilité.
 
-• **Écrit 232 tests automatisés** : 214 tests frontend (Jest + Testing Library) et 18 tests backend (`node --test`).
+• **Écrit 236 tests automatisés** : 214 tests frontend (Jest + Testing Library) et 22 tests backend (`node --test`).
 
 • **Internationalisé l’interface en 5 langues** (FR, EN, ES, DE, PT) et mis en place un bandeau de consentement cookies conditionnant Google Fonts / Google Maps, avec pages légales.
 

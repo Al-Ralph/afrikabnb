@@ -129,11 +129,12 @@ Les migrations sont versionnées dans `prisma/migrations/` (`migration_lock.toml
 | Migration | Contenu |
 |---|---|
 | `20261022000000_init` | enums `Role`, `BookingStatus` ; tables `User`, `Listing`, `Favorite`, `Booking`, `Review` avec index et clés étrangères ; Row Level Security activée (sans policy) sur ces tables |
+| `20261022120000_unaccent` | extension PostgreSQL `unaccent` (recherche insensible aux accents) |
 
 - Appliquer : `npx prisma migrate deploy` (script `npm run db:migrate`), puis `npx prisma generate`.
 - Créer une nouvelle migration après modification du schéma (dev, base locale de préférence) : `npx prisma migrate dev --name <nom>`.
 - Longueurs des colonnes texte (`VARCHAR`) identiques aux limites des schémas `zod` : email 254, nom 100, titre et lieu 200, adresse 300, description 5000, URL d’image / avatar 2048, catégorie 50, commentaire d’avis 1000.
-- Recherche texte (`where` / `q`) : `contains` avec `mode: "insensitive"` (`ILIKE` PostgreSQL).
+- Recherche texte (`where` / `q`) : insensible à la casse **et aux accents** (« Lome » trouve « Lomé ») via `unaccent(lower(...)) LIKE` dans une requête paramétrée (`findListingIdsByText`), les jokers `%`/`_` saisis étant échappés.
 - Verrouillage des réservations et des avis : `SELECT … FROM "Listing" WHERE "id" = … FOR UPDATE` dans une transaction interactive Prisma (compatible avec le pooler en mode transaction).
 
 ## Tests
@@ -194,7 +195,7 @@ Objet **Listing** renvoyé :
 
 - `GET /api/listings` – liste. Réponse : `{ data: [Listing], total, limit, offset }`
   Query (tous facultatifs) :
-  - `where` (ou `q`) : texte recherché dans `location` ou `title` (insensible à la casse)
+  - `where` (ou `q`) : texte recherché dans `location` ou `title` (insensible à la casse et aux accents)
   - `categoryId`, `pets` (`1`/`true` = animaux acceptés), `minPrice`, `maxPrice`
   - `guests` : annonces avec `maxGuests >= guests`
   - `checkIn`, `checkOut` (`YYYY-MM-DD`) : exclut les annonces ayant une réservation non annulée qui chevauche le séjour. `checkOut` doit être > `checkIn` (sinon `400`). Une seule date : la nuit correspondante est vérifiée.

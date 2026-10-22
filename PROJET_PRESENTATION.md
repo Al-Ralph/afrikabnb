@@ -73,13 +73,13 @@ Développement d’une application web full-stack de réservation de logements (
 • **jsonwebtoken** (HS256) et **bcryptjs** (12 rounds)
 • **helmet** et **express-rate-limit**
 • **Axios** pour le géocodage OpenStreetMap Nominatim
-• **node --test** : 18 tests sur la logique métier et la gestion des erreurs
+• **node --test** : 22 tests sur la logique métier, la recherche et la gestion des erreurs
 
 Projet 100 % JavaScript (pas de TypeScript).
 
 ### Base de données
 • **PostgreSQL** hébergé sur **Supabase** (sauvegardes gérées, connexions SSL, tableau de bord / Table Editor), pooler en mode transaction pour l’API et connexion directe pour les migrations
-• **Prisma** avec migration versionnée (`20261022000000_init`), Row Level Security activée contre l’API REST publique de Supabase, et seed de démo idempotent
+• **Prisma** avec migrations versionnées (`20261022000000_init`, `20261022120000_unaccent`), Row Level Security activée contre l’API REST publique de Supabase, et seed de démo idempotent
 
 ### Déploiement et DevOps
 • **Docker** pour le backend : image de l’API (connectée à Supabase) ; **Docker Compose** pour une pile locale facultative API + PostgreSQL 16 avec volume persistant
@@ -154,7 +154,7 @@ Le seed est refusé si `NODE_ENV=production`, il ne s’exécute donc pas dans l
 ## Résultats et impact
 
 • **Parcours complet fonctionnel** : recherche → fiche logement → réservation → annulation ou avis après séjour, côté voyageur comme côté hôte
-• **Fiabilité** : 214 tests frontend et 18 tests backend, réservation protégée contre la double-réservation concurrente
+• **Fiabilité** : 214 tests frontend et 22 tests backend, réservation protégée contre la double-réservation concurrente
 • **Interface multilingue** (5 langues) avec consentement cookies et pages légales
 • **Base saine pour évoluer** : domaines séparés, migrations versionnées, seed reproductible (20 annonces, 9 catégories, 3 comptes de démo)
 • **Limites actuelles** : pas de paiement en ligne, pas de messagerie hôte/voyageur, une seule image par annonce, modes de calendrier « Mois » / « Flexibles » non implémentés, déploiement du frontend non décrit, Create React App déprécié (migration Vite envisagée)

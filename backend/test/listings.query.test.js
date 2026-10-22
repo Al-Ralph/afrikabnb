@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildListingWhere } from "../src/api/listings/listings.query.js";
+import {
+  buildListingWhere,
+  escapeLike,
+  findListingIdsByText,
+  searchText,
+} from "../src/api/listings/listings.query.js";
 
 test("aucun filtre : where vide", () => {
   assert.deepEqual(buildListingWhere({}), {});
@@ -52,4 +57,38 @@ test("`q` est un alias de `where` (recherche insensible à la casse PostgreSQL)"
     { location: { contains: "Lomé", mode: "insensitive" } },
     { title: { contains: "Lomé", mode: "insensitive" } },
   ]);
+});
+
+test("textMatchIds (recherche sans accents) remplace le filtre ILIKE", () => {
+  const where = buildListingWhere({ where: "Lome", pets: "1" }, { textMatchIds: ["a", "b"] });
+  assert.deepEqual(where.id, { in: ["a", "b"] });
+  assert.equal(where.OR, undefined);
+  assert.equal(where.acceptsPets, true);
+  // Aucun résultat texte : liste vide, donc aucune annonce (et non « pas de filtre »).
+  assert.deepEqual(buildListingWhere({ where: "zzz" }, { textMatchIds: [] }).id, { in: [] });
+});
+
+test("searchText : `where` prioritaire, `q` en alias, vide ignoré", () => {
+  assert.equal(searchText({ where: "Lomé", q: "Dakar" }), "Lomé");
+  assert.equal(searchText({ q: "Dakar" }), "Dakar");
+  assert.equal(searchText({ where: "" }), undefined);
+});
+
+test("escapeLike neutralise les jokers de LIKE", () => {
+  assert.equal(escapeLike("100%_ok\\"), "100\\%\\_ok\\\\");
+  assert.equal(escapeLike("Lomé"), "Lomé");
+});
+
+test("findListingIdsByText passe le motif échappé en paramètre (pas de concaténation SQL)", async () => {
+  let captured;
+  const fakePrisma = {
+    $queryRaw: (strings, ...values) => {
+      captured = { sql: strings.join("?"), values };
+      return Promise.resolve([{ id: "x" }]);
+    },
+  };
+  const ids = await findListingIdsByText(fakePrisma, "50%");
+  assert.deepEqual(ids, ["x"]);
+  assert.match(captured.sql, /unaccent\(lower\("title"\)\)/);
+  assert.deepEqual(captured.values, ["%50\\%%", "%50\\%%"]);
 });
