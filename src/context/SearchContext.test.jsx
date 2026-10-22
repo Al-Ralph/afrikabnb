@@ -6,7 +6,7 @@ const wrapper = ({ children }) => <SearchProvider>{children}</SearchProvider>;
 
 describe("SearchContext", () => {
   test("throws outside the provider", () => {
-    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useSearch())).toThrow(/SearchProvider/);
     spy.mockRestore();
   });

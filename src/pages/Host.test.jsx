@@ -5,38 +5,37 @@ import { LanguageProvider } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
 
-jest.mock("../api/client", () => {
-  const actual = jest.requireActual("../api/client");
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual("../api/client");
   return {
     ...actual,
     api: {
-      getMyListings: jest.fn(),
-      getMyHostBookings: jest.fn(),
-      deleteListing: jest.fn(),
-      cancelBooking: jest.fn(),
-      createListing: jest.fn(),
-      updateListing: jest.fn(),
-      geocode: jest.fn(),
+      getMyListings: vi.fn(),
+      getMyHostBookings: vi.fn(),
+      deleteListing: vi.fn(),
+      cancelBooking: vi.fn(),
+      createListing: vi.fn(),
+      updateListing: vi.fn(),
+      geocode: vi.fn(),
     },
   };
 });
-jest.mock("../context/AuthContext", () => ({
-  useAuth: jest.fn(),
+vi.mock("../context/AuthContext", () => ({
+  useAuth: vi.fn(),
   OPEN_AUTH_EVENT: "afrikabnb:open-auth",
 }));
-jest.mock("../hooks/useGoogleMapsScript", () => ({
+vi.mock("../hooks/useGoogleMapsScript", () => ({
   useGoogleMapsScript: () => ({ loaded: false, error: null, hasKey: false }),
 }));
-jest.mock("../components/Footer", () => () => <footer>Footer</footer>);
+vi.mock("../components/Footer", () => ({ default: () => <footer>Footer</footer> }));
 
 const nextYear = new Date().getFullYear() + 1;
 const listing = { id: "1", title: "Villa Lagune", location: "Lomé", price: 45000, currency: "XOF", upcomingBookings: 2, image: "https://img.test/v.jpg" };
@@ -72,7 +71,7 @@ beforeEach(() => {
 describe("Host", () => {
   test("logged out: invites to log in and dispatches the open-auth event", () => {
     useAuth.mockReturnValue({ user: null, loading: false });
-    const onOpenAuth = jest.fn();
+    const onOpenAuth = vi.fn();
     window.addEventListener("afrikabnb:open-auth", onOpenAuth);
     renderHost();
     fireEvent.click(screen.getByRole("button", { name: "Se connecter pour devenir hôte" }));

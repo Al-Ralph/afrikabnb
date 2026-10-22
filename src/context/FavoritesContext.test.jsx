@@ -4,12 +4,12 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { FavoritesProvider, useFavorites } from "./FavoritesContext";
 import { api } from "../api/client";
 
-jest.mock("../api/client", () => ({
+vi.mock("../api/client", () => ({
   api: {
-    getMe: jest.fn(),
-    getFavorites: jest.fn(),
-    addFavorite: jest.fn(),
-    removeFavorite: jest.fn(),
+    getMe: vi.fn(),
+    getFavorites: vi.fn(),
+    addFavorite: vi.fn(),
+    removeFavorite: vi.fn(),
   },
 }));
 
@@ -45,7 +45,7 @@ async function renderLoggedIn(initialFavorites = []) {
 
 beforeEach(() => {
   localStorage.clear();
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("FavoritesContext", () => {

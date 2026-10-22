@@ -8,9 +8,9 @@ const checkIn = new Date(nextYear, 5, 10); // 10 juin de l'année prochaine
 
 const renderPanel = (props = {}) => {
   const handlers = {
-    onCheckInChange: jest.fn(),
-    onCheckOutChange: jest.fn(),
-    onFlexibilityChange: jest.fn(),
+    onCheckInChange: vi.fn(),
+    onCheckOutChange: vi.fn(),
+    onFlexibilityChange: vi.fn(),
   };
   render(<DatePickerPanel flexibility="exact" {...handlers} {...props} />);
   return handlers;
@@ -56,7 +56,7 @@ describe("DatePickerPanel", () => {
   });
 
   test("isDateDisabled blocks a day (disabled button, click ignored) and receives the current step", () => {
-    const isDateDisabled = jest.fn((date) => date.getDate() === 15 && date.getMonth() === 5);
+    const isDateDisabled = vi.fn((date) => date.getDate() === 15 && date.getMonth() === 5);
     const { onCheckOutChange } = renderPanel({ checkIn, checkOut: null, isDateDisabled });
     const blocked = dayButton(0, 15);
     expect(blocked).toBeDisabled();

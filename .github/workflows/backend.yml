@@ -1,0 +1,119 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    name: Tests et audit
+    runs-on: ubuntu-latest
+    env:
+      # Valeurs factices : seulement pour `prisma generate` / `prisma validate` (aucune connexion).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma validate
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+
+  smoke:
+    name: Smoke test (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: afrikabnb_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d afrikabnb_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Base jetable du job CI : jamais de vraie base ici.
+      NODE_ENV: development
+      PORT: 4199
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/afrikabnb_ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/afrikabnb_ci?schema=public
+      CORS_ORIGIN: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Générer un JWT_SECRET de test
+        run: |
+          secret=$(openssl rand -base64 48)
+          echo "::add-mask::$secret"
+          echo "JWT_SECRET=$secret" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Appliquer les migrations
+        run: npx prisma migrate deploy
+      - name: Seed
+        run: npm run db:seed
+      - name: Démarrer l'API en arrière-plan
+        run: |
+          nohup npm start > api.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4199/health && exit 0
+            sleep 1
+          done
+          echo "L'API n'a pas démarré :"; cat api.log; exit 1
+      - name: Requêtes de fumée
+        run: |
+          set -euo pipefail
+          base=http://127.0.0.1:4199
+
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/health")" = 200
+
+          total=$(curl -fsS "$base/api/listings" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).total))')
+          echo "listings total=$total"
+          test "$total" -gt 0
+
+          # Recherche insensible aux accents : « Lome » doit trouver « Lomé » (extension unaccent).
+          found=$(curl -fsS "$base/api/listings?where=Lome" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).total))')
+          echo "where=Lome total=$found"
+          test "$found" -gt 0
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"host@afrikabnb.com","password":"demo1234"}')
+          echo "login demo -> $code"
+          test "$code" = 200
+      - name: Logs de l'API (en cas d'échec)
+        if: failure()
+        run: cat api.log || true

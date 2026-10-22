@@ -17,6 +17,8 @@ Copier `.env.example` vers `.env` et remplacer toutes les valeurs. La config est
 | `JWT_EXPIRES_IN` | Validité des tokens | `1d` |
 | `CORS_ORIGIN` | Origines autorisées, séparées par des virgules | **obligatoire en production**, `*` interdit ; dev : `http://localhost:3000` |
 | `TRUST_PROXY` | Nombre de reverse proxys devant l’API (rate limiting par IP) | `0` |
+| `LOG_LEVEL` | Niveau de logs pino (`fatal`, `error`, `warn`, `info`, `debug`, `trace`) | `debug` en développement, `info` sinon |
+| `LOG_SQL` | `1` : journalise toutes les requêtes SQL de Prisma (très verbeux) | désactivé |
 | `POSTGRES_PASSWORD` | Mot de passe de la base locale Docker Compose | obligatoire pour `docker compose`, sans `@ : / ? #` |
 | `POSTGRES_USER`, `POSTGRES_DB` | Utilisateur / base locale (Compose) | `afrikabnb` |
 
@@ -80,7 +82,7 @@ Un projet gratuit inactif peut être mis en pause par Supabase (il se relance de
 
 - L’API accède à la base **uniquement via Prisma**, avec le rôle `postgres` et les URL de connexion. Les clés Supabase (`anon`, `service_role`) et le client `supabase-js` ne sont **pas utilisés**.
 - Supabase expose aussi le schéma `public` via son API REST (Data API) avec la clé `anon`. La migration initiale active donc **Row Level Security sans aucune policy** sur `User`, `Listing`, `Favorite`, `Booking` et `Review` : ces tables sont inaccessibles par cette API, tandis que Prisma (propriétaire des tables) n’est pas concerné. Pour la table technique `_prisma_migrations`, exécuter une fois dans le SQL Editor : `alter table "_prisma_migrations" enable row level security;` (ou désactiver la Data API dans les paramètres du projet si elle ne sert pas).
-- **Ne jamais exposer `DATABASE_URL` / `DIRECT_URL` côté frontend** (aucune variable `REACT_APP_*` ne doit les contenir) : elles donnent un accès complet à la base. Le frontend ne parle qu’à l’API Express.
+- **Ne jamais exposer `DATABASE_URL` / `DIRECT_URL` côté frontend** (aucune variable `VITE_*` ne doit les contenir : elles sont incluses dans le bundle public) : elles donnent un accès complet à la base. Le frontend ne parle qu’à l’API Express.
 - Les URL imposent `sslmode=require` : connexions chiffrées.
 
 ## Lancer l’API avec Docker
@@ -136,6 +138,16 @@ Les migrations sont versionnées dans `prisma/migrations/` (`migration_lock.toml
 - Longueurs des colonnes texte (`VARCHAR`) identiques aux limites des schémas `zod` : email 254, nom 100, titre et lieu 200, adresse 300, description 5000, URL d’image / avatar 2048, catégorie 50, commentaire d’avis 1000.
 - Recherche texte (`where` / `q`) : insensible à la casse **et aux accents** (« Lome » trouve « Lomé ») via `unaccent(lower(...)) LIKE` dans une requête paramétrée (`findListingIdsByText`), les jokers `%`/`_` saisis étant échappés.
 - Verrouillage des réservations et des avis : `SELECT … FROM "Listing" WHERE "id" = … FOR UPDATE` dans une transaction interactive Prisma (compatible avec le pooler en mode transaction).
+
+## Logs
+
+Logs structurés avec **pino** / **pino-http** (`src/config/logger.js`) : sortie lisible via `pino-pretty` en `NODE_ENV=development` (si la devDependency est installée), JSON sur une ligne en production.
+
+- Chaque requête reçoit un identifiant : l'en-tête `X-Request-Id` est repris s'il est valide (`[A-Za-z0-9._-]`, 8 à 128 caractères), sinon un UUID est généré. Il est renvoyé dans l'en-tête de réponse `X-Request-Id`, présent dans chaque log (`req.id`) et dans le corps des réponses 5xx (`{ "error": "Erreur serveur", "requestId": "…" }`) pour retrouver l'erreur complète dans les logs.
+- Niveau selon le statut : 2xx/3xx `info`, 4xx `warn`, 5xx `error`.
+- Les en-têtes `Authorization`, `Cookie`, `X-Api-Key` et `Set-Cookie` sont masqués (`redact`) ; les corps de requête ne sont jamais journalisés.
+- Les requêtes SQL de Prisma ne sont plus journalisées par défaut : `LOG_SQL=1` pour les afficher.
+- `src/config/env.js` et `prisma/seed.js` gardent `console` : le premier s'exécute avant le logger (validation de la config, arrêt du processus), le second est un script en ligne de commande.
 
 ## Tests
 

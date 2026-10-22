@@ -9,9 +9,9 @@ const nominatim = axios.create({
   headers: { "User-Agent": "AfrikaBnB-API/1.0 (geocoding backend)" },
 });
 
-function upstreamError(err, res, next) {
+function upstreamError(err, req, res, next) {
   if (axios.isAxiosError(err)) {
-    console.error(`[maps] Nominatim indisponible : ${err.code || err.response?.status || err.message}`);
+    req.log.warn(`[maps] Nominatim indisponible : ${err.code || err.response?.status || err.message}`);
     return res.status(502).json({ error: "Service de géocodage indisponible" });
   }
   next(err);
@@ -32,7 +32,7 @@ export async function geocode(req, res, next) {
     }));
     res.json({ results });
   } catch (err) {
-    upstreamError(err, res, next);
+    upstreamError(err, req, res, next);
   }
 }
 
@@ -50,7 +50,7 @@ export async function reverseGeocode(req, res, next) {
       address: data?.address,
     });
   } catch (err) {
-    upstreamError(err, res, next);
+    upstreamError(err, req, res, next);
   }
 }
 

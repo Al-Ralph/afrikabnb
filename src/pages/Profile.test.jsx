@@ -5,23 +5,22 @@ import { LanguageProvider } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { api, toIsoDay } from "../api/client";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
-jest.mock("../api/client", () => {
-  const actual = jest.requireActual("../api/client");
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual("../api/client");
   return {
     ...actual,
-    api: { getMyBookings: jest.fn(), cancelBooking: jest.fn(), createReview: jest.fn(), updateProfile: jest.fn() },
+    api: { getMyBookings: vi.fn(), cancelBooking: vi.fn(), createReview: vi.fn(), updateProfile: vi.fn() },
   };
 });
-jest.mock("../context/AuthContext", () => ({ useAuth: jest.fn() }));
-jest.mock("../components/Footer", () => () => <footer>Footer</footer>);
+vi.mock("../context/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("../components/Footer", () => ({ default: () => <footer>Footer</footer> }));
 
 const day = (offset) => {
   const d = new Date();
@@ -83,7 +82,7 @@ const cancelled = {
 const kofi = { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi", avatar: null };
 
 function setup({ user = kofi, bookings = [upcoming, pastToReview, pastReviewed, cancelled] } = {}) {
-  const auth = { user, loading: false, openAuth: jest.fn(), updateUser: jest.fn() };
+  const auth = { user, loading: false, openAuth: vi.fn(), updateUser: vi.fn() };
   useAuth.mockReturnValue(auth);
   api.getMyBookings.mockResolvedValue(bookings);
   render(
@@ -242,7 +241,7 @@ describe("Profile page", () => {
     });
 
     test("load error offers a retry", async () => {
-      useAuth.mockReturnValue({ user: kofi, loading: false, openAuth: jest.fn(), updateUser: jest.fn() });
+      useAuth.mockReturnValue({ user: kofi, loading: false, openAuth: vi.fn(), updateUser: vi.fn() });
       api.getMyBookings.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce([upcoming]);
       render(
         <LanguageProvider>

@@ -5,25 +5,24 @@ import { LanguageProvider } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
 
-jest.mock("../../api/client", () => {
-  const actual = jest.requireActual("../../api/client");
-  return { ...actual, api: { getAvailability: jest.fn(), createBooking: jest.fn() } };
+vi.mock("../../api/client", async () => {
+  const actual = await vi.importActual("../../api/client");
+  return { ...actual, api: { getAvailability: vi.fn(), createBooking: vi.fn() } };
 });
 
-jest.mock("../../context/AuthContext", () => ({ useAuth: jest.fn() }));
+vi.mock("../../context/AuthContext", () => ({ useAuth: vi.fn(), OPEN_AUTH_EVENT: "afrikabnb:open-auth" }));
 
 const nextYear = new Date().getFullYear() + 1;
 let mockApplied = {};
-jest.mock("../../context/SearchContext", () => ({ useSearch: () => ({ appliedSearch: mockApplied }) }));
+vi.mock("../../context/SearchContext", () => ({ useSearch: () => ({ appliedSearch: mockApplied }) }));
 
 const listing = { id: "7", title: "Villa Lomé", price: 45000, currency: "XOF", maxGuests: 3, hostId: "host-1" };
 const xof = (n) => new Intl.NumberFormat("fr", { style: "currency", currency: "XOF" }).format(n);
@@ -118,7 +117,7 @@ describe("BookingWidget", () => {
 
   test("when logged out, asks to log in and dispatches the open-auth event", async () => {
     useAuth.mockReturnValue({ user: null });
-    const onOpenAuth = jest.fn();
+    const onOpenAuth = vi.fn();
     window.addEventListener(OPEN_AUTH_EVENT, onOpenAuth);
     await renderWidget();
     fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
