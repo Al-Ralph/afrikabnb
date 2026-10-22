@@ -1,14 +1,21 @@
 .listing-form {
-  padding: 24px;
-  border: 1px solid var(--color-border);
+  padding: var(--space-6);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  animation: listing-form-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes listing-form-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .listing-form-title {
-  margin: 0 0 20px;
-  font-size: 1.3rem;
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-lg);
+  font-weight: 600;
   color: var(--color-text);
 }
 
@@ -41,8 +48,9 @@
 .listing-form-field select,
 .listing-form-field textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
+  min-height: 46px;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
@@ -57,19 +65,20 @@
 .listing-form-field input:focus,
 .listing-form-field select:focus,
 .listing-form-field textarea:focus {
-  outline: 2px solid var(--color-text);
-  outline-offset: 0;
-  border-color: transparent;
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 1px var(--color-focus);
 }
 
 .listing-form-field [aria-invalid="true"] {
-  border-color: #c4161c;
-  background: #fff7f7;
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
 }
 
 .listing-form-error {
   font-size: 0.85rem;
-  color: #a61b1f;
+  color: var(--color-danger);
+  font-weight: 600;
 }
 
 .listing-form-hint {
@@ -106,7 +115,7 @@
   overflow: hidden;
   max-width: 360px;
   aspect-ratio: 16 / 10;
-  background: var(--color-bg);
+  background: var(--color-surface-2);
 }
 
 .listing-form-preview img {
@@ -119,8 +128,8 @@
   margin: 20px 0 0;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  background: #fdecec;
-  color: #a61b1f;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 
 .listing-form-actions {

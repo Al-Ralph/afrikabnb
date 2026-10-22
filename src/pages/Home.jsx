@@ -7,6 +7,9 @@ import SearchBar from "../components/SearchBar";
 import Categories from "../components/Categories";
 import PropertyCard from "../components/PropertyCard";
 import Footer from "../components/Footer";
+import EmptyState from "../components/EmptyState";
+import { ListingGridSkeleton } from "../components/Skeleton";
+import { pluralize } from "../utils/plural";
 import { api, isApiUnreachable } from "../api/client";
 import { listings as mockListings } from "../data/listings";
 import "./Home.css";
@@ -22,7 +25,7 @@ function filterMockListings(where) {
 }
 
 const Home = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { appliedSearch, resetSearch } = useSearch();
   const [urlParams, setUrlParams] = useSearchParams();
   const [listings, setListings] = useState([]);
@@ -75,42 +78,48 @@ const Home = () => {
     <>
       <main className="home">
         <Hero />
-
-        <section className="home-search" id="listings-anchor" aria-labelledby="home-search-heading">
-          <h2 className="home-search-title" id="home-search-heading">
-            {t("home.title")} <span className="hero-title-accent">{t("home.titleAccent")}</span>
-          </h2>
+        {/* Recherche à cheval sur le bas de la photo (styles dans Hero.css). */}
+        <div className="hero__search">
           <SearchBar />
-        </section>
+        </div>
 
-        <section className="home-content" aria-label={t("home.listingsLabel")}>
+        <section className="home-content" id="listings-anchor" aria-labelledby="home-listings-title">
+          <div className="home-listings-head">
+            <h2 className="home-listings-title" id="home-listings-title">
+              {t("ui.home.listingsTitle")}
+            </h2>
+            {!loading && !error && listings.length > 0 && (
+              <p className="home-listings-count">{pluralize(t, language, "ui.home.count", listings.length)}</p>
+            )}
+          </div>
           <Categories />
           {!loading && useMock && (
             <p className="listings-demo-banner" role="note">{t("home.demoBanner")}</p>
           )}
-          {loading && (
-            <div className="listings-loading" role="status" aria-live="polite">
-              <div className="listings-loading-spinner" aria-hidden="true" />
-              <p>{t("home.loading")}</p>
-            </div>
-          )}
+          {loading && <ListingGridSkeleton label={t("home.loading")} className="listings-skeleton" />}
           {!loading && error && (
-            <div className="listings-error" role="alert">
+            <EmptyState icon="compass" tone="danger" role="alert" title={t("ui.home.errorTitle")}>
               <p>{t("home.error")}</p>
-            </div>
+            </EmptyState>
           )}
           {!loading && !error && listings.length === 0 && (
-            <div className="listings-empty" role="status">
+            <EmptyState
+              icon="search"
+              role="status"
+              title={t("ui.home.emptyTitle")}
+              action={
+                <button type="button" className="btn btn--secondary" onClick={resetSearch}>
+                  {t("home.resetFilters")}
+                </button>
+              }
+            >
               <p>{t("home.empty")}</p>
-              <button type="button" className="listings-reset-btn" onClick={resetSearch}>
-                {t("home.resetFilters")}
-              </button>
-            </div>
+            </EmptyState>
           )}
           {!loading && !error && listings.length > 0 && (
             <ul className="listings-grid">
-              {listings.map((listing) => (
-                <li key={listing.id} className="listings-item">
+              {listings.map((listing, index) => (
+                <li key={listing.id} className="listings-item" style={{ "--i": Math.min(index, 11) }}>
                   <PropertyCard
                     id={listing.id}
                     location={listing.location}
@@ -118,6 +127,7 @@ const Home = () => {
                     price={listing.price}
                     currency={listing.currency}
                     rating={listing.rating}
+                    reviewCount={listing.reviewCount}
                     image={listing.image}
                   />
                 </li>

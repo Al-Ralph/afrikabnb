@@ -12,20 +12,25 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-grid">
-          <div className="footer-col">
-            <h3 className="footer-title">AfrikaBnB</h3>
+          <div className="footer-col footer-brand">
+            <p className="footer-wordmark">AfrikaBnB</p>
             <p className="footer-desc">{t("footer.description")}</p>
             <p className="footer-demo-note">{t("footer.demoNote")}</p>
           </div>
-          <div className="footer-col">
-            <h3 className="footer-title">{t("footer.explore")}</h3>
+          <nav className="footer-col" aria-labelledby="footer-explore-title">
+            <h2 className="footer-title" id="footer-explore-title">
+              {t("footer.explore")}
+            </h2>
             <ul className="footer-links">
               <li><Link to="/">{t("footer.home")}</Link></li>
+              <li><Link to="/carte">{t("header.map")}</Link></li>
               <li><Link to="/host">{t("footer.listProperty")}</Link></li>
             </ul>
-          </div>
-          <div className="footer-col">
-            <h3 className="footer-title">{t("footer.legal")}</h3>
+          </nav>
+          <nav className="footer-col" aria-labelledby="footer-legal-title">
+            <h2 className="footer-title" id="footer-legal-title">
+              {t("footer.legal")}
+            </h2>
             <ul className="footer-links">
               <li><Link to="/mentions-legales">{t("footer.mentions")}</Link></li>
               <li><Link to="/confidentialite">{t("footer.privacy")}</Link></li>
@@ -37,19 +42,10 @@ const Footer = () => {
                 </button>
               </li>
             </ul>
-          </div>
+          </nav>
         </div>
         <div className="footer-bottom">
           <p className="footer-copyright">{t("footer.copyright")}</p>
-          <nav className="footer-legal" aria-label={t("footer.legal")}>
-            <Link to="/mentions-legales">{t("footer.mentions")}</Link>
-            <span className="footer-dot">·</span>
-            <Link to="/confidentialite">{t("footer.privacy")}</Link>
-            <span className="footer-dot">·</span>
-            <Link to="/cookies">{t("footer.cookies")}</Link>
-            <span className="footer-dot">·</span>
-            <Link to="/cgu">{t("footer.terms")}</Link>
-          </nav>
         </div>
       </div>
     </footer>

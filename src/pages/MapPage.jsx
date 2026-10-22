@@ -8,6 +8,7 @@ import { listings as mockListings } from "../data/listings";
 import GoogleListingsMap from "../components/map/GoogleListingsMap";
 import MapListingList from "../components/map/MapListingList";
 import Footer from "../components/Footer";
+import { ListSkeleton } from "../components/Skeleton";
 import "./MapPage.css";
 
 // Liste de repli quand la carte Google n'est pas disponible (aucune requête Google).
@@ -46,11 +47,7 @@ const FallbackList = ({ where, filters }) => {
   }, [filtersKey]);
 
   if (status === "loading") {
-    return (
-      <p className="map-page-status" role="status">
-        {t("map.loading")}
-      </p>
-    );
+    return <ListSkeleton label={t("map.loading")} rows={4} className="map-page-skeleton" />;
   }
   if (status === "error") {
     return (

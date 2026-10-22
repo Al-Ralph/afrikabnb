@@ -4,6 +4,8 @@ import Footer from "../components/Footer";
 import ListingForm from "../components/host/ListingForm";
 import HostBookings from "../components/host/HostBookings";
 import ConfirmButton from "../components/host/ConfirmButton";
+import EmptyState from "../components/EmptyState";
+import { ListSkeleton } from "../components/Skeleton";
 import { formatPrice } from "../utils/format";
 import { useAuth, OPEN_AUTH_EVENT } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -92,9 +94,9 @@ const Host = () => {
   if (authLoading) {
     return (
       <main className="host-page">
-        <p className="host-muted" role="status">
-          {t("host.loading")}
-        </p>
+        <div className="host-page-inner">
+          <ListSkeleton label={t("host.loading")} rows={3} />
+        </div>
       </main>
     );
   }
@@ -104,18 +106,26 @@ const Host = () => {
       <>
         <main className="host-page">
           <div className="host-page-invite">
-            <h1>{t("host.inviteTitle")}</h1>
-            <p>{t("host.inviteText")}</p>
-            <button
-              type="button"
-              className="host-btn host-btn--primary"
-              onClick={() => window.dispatchEvent(new CustomEvent(OPEN_AUTH_EVENT))}
+            <EmptyState
+              icon="key"
+              action={
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => window.dispatchEvent(new CustomEvent(OPEN_AUTH_EVENT))}
+                  >
+                    {t("host.inviteCta")}
+                  </button>
+                  <Link to="/" className="btn btn--ghost">
+                    {t("property.backHome")}
+                  </Link>
+                </>
+              }
             >
-              {t("host.inviteCta")}
-            </button>
-            <Link to="/" className="host-page-back">
-              {t("property.backHome")}
-            </Link>
+              <h1 className="host-page-invite-title">{t("host.inviteTitle")}</h1>
+              <p>{t("host.inviteText")}</p>
+            </EmptyState>
           </div>
         </main>
         <Footer />
@@ -159,18 +169,16 @@ const Host = () => {
 
           <section className="host-section" aria-labelledby="host-listings-title">
             <h2 id="host-listings-title">{t("host.myListings")}</h2>
-            {listingsStatus === "loading" && (
-              <p className="host-muted" role="status">
-                {t("host.loading")}
-              </p>
-            )}
+            {listingsStatus === "loading" && <ListSkeleton label={t("host.loading")} rows={2} />}
             {listingsStatus === "error" && (
               <p className="host-alert" role="alert">
                 {t("host.loadError")}
               </p>
             )}
             {listingsStatus === "ready" && listings.length === 0 && (
-              <p className="host-muted">{t("host.noListings")}</p>
+              <EmptyState compact icon="home" title={t("ui.host.noListingsTitle")}>
+                <p>{t("host.noListings")}</p>
+              </EmptyState>
             )}
             {listingsStatus === "ready" && listings.length > 0 && (
               <ul className="host-listings">
@@ -216,11 +224,7 @@ const Host = () => {
 
           <section className="host-section" aria-labelledby="host-bookings-title">
             <h2 id="host-bookings-title">{t("host.receivedBookings")}</h2>
-            {bookingsStatus === "loading" && (
-              <p className="host-muted" role="status">
-                {t("host.loading")}
-              </p>
-            )}
+            {bookingsStatus === "loading" && <ListSkeleton label={t("host.loading")} rows={2} media={false} />}
             {bookingsStatus === "error" && (
               <p className="host-alert" role="alert">
                 {t("host.loadError")}

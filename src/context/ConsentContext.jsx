@@ -4,7 +4,7 @@ const STORAGE_KEY = "afrikabnb_consent";
 const MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000; // 6 mois
 const FONTS_LINK_ID = "afrikabnb-google-fonts";
 const FONTS_HREF =
-  "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&display=swap";
 
 const ConsentContext = createContext(null);
 

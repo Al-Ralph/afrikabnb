@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import LanguageSelector from "./LanguageSelector";
+import ThemeToggle from "./ThemeToggle";
 import AuthModal from "./AuthModal";
 import "./Header.css";
 
@@ -133,6 +134,7 @@ const Header = () => {
           </Link>
           <nav className="header-nav" aria-label="Navigation principale">
             <Link to="/host" className="header-link">{t("header.becomeHost")}</Link>
+            <ThemeToggle />
             <LanguageSelector />
             {user ? (
               <div className="header-user-menu-wrap" ref={menuRef}>

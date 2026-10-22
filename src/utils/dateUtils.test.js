@@ -6,6 +6,14 @@ import {
   isInRange,
   FR_MONTHS,
   FR_DAYS,
+  getMonthNames,
+  getWeekStart,
+  getWeekdayLabels,
+  addMonths,
+  monthStart,
+  rangeForMonth,
+  rangeForFlexible,
+  upcomingMonths,
 } from "./dateUtils";
 
 describe("getMonthGrid", () => {
@@ -67,10 +75,15 @@ describe("getMonthGrid", () => {
 });
 
 describe("formatDateShort", () => {
-  test("formats as 'day abbreviated-French-month'", () => {
-    expect(formatDateShort(new Date(2024, 0, 5))).toBe("5 Jan");
-    expect(formatDateShort(new Date(2024, 7, 15))).toBe("15 Aoû");
-    expect(formatDateShort(new Date(2024, 11, 31))).toBe("31 Déc");
+  test("formats as day + abbreviated month, in French by default", () => {
+    expect(formatDateShort(new Date(2024, 0, 5))).toBe("5 janv.");
+    expect(formatDateShort(new Date(2024, 7, 15))).toBe("15 août");
+    expect(formatDateShort(new Date(2024, 11, 31))).toBe("31 déc.");
+  });
+
+  test("follows the requested locale (English puts the month first)", () => {
+    expect(formatDateShort(new Date(2024, 0, 5), "en")).toBe("Jan 5");
+    expect(formatDateShort(new Date(2024, 0, 5), "de")).toBe("5. Jan.");
   });
 
   test("returns empty string for null/undefined", () => {
@@ -81,7 +94,7 @@ describe("formatDateShort", () => {
   test("uses the normalised date after month overflow (31 Jan 2023 set to February => 3 Mar)", () => {
     const d = new Date(2023, 0, 31);
     d.setMonth(1);
-    expect(formatDateShort(d)).toBe("3 Mar");
+    expect(formatDateShort(d)).toBe("3 mars");
   });
 
   test("returns empty string for an Invalid Date instead of throwing", () => {
@@ -194,9 +207,91 @@ describe("constants", () => {
   test("FR_MONTHS has 12 entries starting with Janvier", () => {
     expect(FR_MONTHS).toHaveLength(12);
     expect(FR_MONTHS[0]).toBe("Janvier");
+    expect(FR_MONTHS[7]).toBe("Août");
   });
 
-  test("FR_DAYS has 7 entries", () => {
+  test("FR_DAYS has 7 entries, Sunday first", () => {
     expect(FR_DAYS).toHaveLength(7);
+    expect(FR_DAYS).toEqual(["D", "L", "M", "M", "J", "V", "S"]);
+  });
+});
+
+describe("locale helpers", () => {
+  test("getMonthNames gives 12 capitalised names per language", () => {
+    expect(getMonthNames("en")[0]).toBe("January");
+    expect(getMonthNames("es")[11]).toBe("Diciembre");
+    expect(getMonthNames("de")[2]).toBe("März");
+    expect(getMonthNames("pt")[2]).toBe("Março");
+    ["fr", "en", "es", "de", "pt"].forEach((l) => expect(new Set(getMonthNames(l)).size).toBe(12));
+  });
+
+  test("week starts on Sunday for English, Monday otherwise", () => {
+    expect(getWeekStart("en")).toBe(0);
+    ["fr", "es", "de", "pt"].forEach((l) => expect(getWeekStart(l)).toBe(1));
+  });
+
+  test("getWeekdayLabels starts at the requested weekday", () => {
+    expect(getWeekdayLabels("en", 0)).toEqual(["S", "M", "T", "W", "T", "F", "S"]);
+    expect(getWeekdayLabels("fr")).toEqual(["L", "M", "M", "J", "V", "S", "D"]);
+  });
+
+  test("getMonthGrid honours weekStart (Monday-first)", () => {
+    // 1er septembre 2024 = dimanche : dernière colonne si la semaine commence le lundi.
+    const g = getMonthGrid(2024, 8, 1);
+    expect(g[0].slice(0, 6)).toEqual([null, null, null, null, null, null]);
+    expect(g[0][6]).toBe(1);
+    // 1er mai 2024 = mercredi : colonne 2 en semaine lundi-first.
+    expect(getMonthGrid(2024, 4, 1)[0][2]).toBe(1);
+  });
+});
+
+describe("month / flexible ranges", () => {
+  const today = new Date(2026, 4, 20); // mercredi 20 mai 2026
+
+  test("addMonths clamps to the end of a shorter month", () => {
+    expect(addMonths(new Date(2024, 0, 31), 1)).toEqual(new Date(2024, 1, 29));
+  });
+
+  test("monthStart is the 1st, or today for the current month", () => {
+    expect(monthStart({ year: 2026, month: 6 }, today)).toEqual(new Date(2026, 6, 1));
+    expect(monthStart({ year: 2026, month: 4 }, today)).toEqual(today);
+  });
+
+  test("rangeForMonth: 1st of the month + 1 week / 1 month", () => {
+    expect(rangeForMonth({ year: 2026, month: 6 }, "week", today)).toEqual({
+      checkIn: new Date(2026, 6, 1),
+      checkOut: new Date(2026, 6, 8),
+    });
+    expect(rangeForMonth({ year: 2026, month: 6 }, "month", today)).toEqual({
+      checkIn: new Date(2026, 6, 1),
+      checkOut: new Date(2026, 7, 1),
+    });
+  });
+
+  test("rangeForMonth never starts in the past", () => {
+    expect(rangeForMonth({ year: 2026, month: 4 }, "week", today).checkIn).toEqual(today);
+  });
+
+  test("rangeForFlexible uses the earliest chosen month; weekend starts on a Friday for 2 nights", () => {
+    const r = rangeForFlexible([{ year: 2026, month: 8 }, { year: 2026, month: 6 }], "weekend", today);
+    // 1er juillet 2026 = mercredi -> vendredi 3 juillet
+    expect(r.checkIn).toEqual(new Date(2026, 6, 3));
+    expect(r.checkIn.getDay()).toBe(5);
+    expect(r.checkOut).toEqual(new Date(2026, 6, 5));
+  });
+
+  test("rangeForFlexible: week and month durations; null without any month", () => {
+    const m = [{ year: 2026, month: 6 }];
+    expect(rangeForFlexible(m, "week", today).checkOut).toEqual(new Date(2026, 6, 8));
+    expect(rangeForFlexible(m, "month", today).checkOut).toEqual(new Date(2026, 7, 1));
+    expect(rangeForFlexible([], "week", today)).toBeNull();
+  });
+
+  test("upcomingMonths lists consecutive months across the year boundary", () => {
+    expect(upcomingMonths(3, new Date(2026, 10, 15))).toEqual([
+      { year: 2026, month: 10 },
+      { year: 2026, month: 11 },
+      { year: 2027, month: 0 },
+    ]);
   });
 });
