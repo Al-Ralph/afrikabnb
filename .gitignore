@@ -28,3 +28,9 @@ yarn-error.log*
 # état local oh-my-claudecode (sauf skills de projet)
 .omc/*
 !.omc/skills/
+
+# tests de bout en bout (Playwright)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
