@@ -34,6 +34,12 @@ export const logger = pino(
   await developmentStream()
 );
 
+// Jetons portés par le chemin de l'URL (lien de suivi d'une réservation sans compte) : masqués
+// dans les logs de requête et d'erreur.
+export function maskSensitiveUrl(url) {
+  return typeof url === "string" ? url.replace(/(\/api\/guest-bookings\/)[^/?#]+/, "$1[masqué]") : url;
+}
+
 const VALID_REQUEST_ID = /^[A-Za-z0-9._-]{8,128}$/;
 
 export function genReqId(req, res) {
@@ -47,7 +53,14 @@ export const httpLogger = pinoHttp({
   logger,
   genReqId,
   // En-têtes de réponse (helmet, rate limit…) trop verbeux : seul le statut est journalisé.
-  serializers: { res: (res) => ({ statusCode: res.statusCode }) },
+  serializers: {
+    req: (req) => {
+      req.url = maskSensitiveUrl(req.url);
+      if (req.params?.token) req.params = { ...req.params, token: "[masqué]" };
+      return req;
+    },
+    res: (res) => ({ statusCode: res.statusCode }),
+  },
   customLogLevel: (req, res, err) => {
     if (err || res.statusCode >= 500) return "error";
     if (res.statusCode >= 400) return "warn";

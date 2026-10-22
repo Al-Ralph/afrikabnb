@@ -46,6 +46,22 @@ const CGU = () => (
             financière n’est effectuée) et, après un séjour terminé, publier un avis.
           </p>
           <p>
+            <strong>Réservation sans compte</strong> : il est aussi possible de réserver sans créer
+            de compte. Une réservation sans compte est toujours une <strong>demande</strong> que
+            l’hôte accepte ou refuse sous 48 heures ; elle se suit et s’annule via le lien personnel
+            envoyé par e-mail (à ne pas partager). Le nombre de demandes en attente est limité par
+            adresse e-mail.
+          </p>
+          <p>
+            <strong>Coordonnées transmises à l’hôte</strong> : toute réservation (avec ou sans
+            compte) exige de renseigner un nom, une adresse e-mail, un téléphone et un pays, et
+            éventuellement une heure d’arrivée et un message. En validant la réservation, vous
+            acceptez les présentes CGU et que ces informations soient transmises à l’hôte du
+            logement pour organiser votre séjour (voir la{" "}
+            <Link to="/confidentialite">Politique de confidentialité</Link>). Vous vous engagez à
+            fournir des coordonnées exactes ; l’hôte s’engage à ne les utiliser que pour ce séjour.
+          </p>
+          <p>
             La note d’une annonce est la <strong>moyenne des avis</strong> déposés par les
             voyageurs ayant séjourné dans le logement ; un seul avis est possible par séjour.
             L’hôte ne peut pas fixer lui-même cette note. Les annonces et avis de démonstration

@@ -14,15 +14,15 @@ root.render(
   <React.StrictMode>
     <LanguageProvider>
       <CurrencyProvider>
-      <ConsentProvider>
-        <AuthProvider>
-          <FavoritesProvider>
-            <SearchProvider>
-              <App />
-            </SearchProvider>
-          </FavoritesProvider>
-        </AuthProvider>
-      </ConsentProvider>
+        <ConsentProvider>
+          <AuthProvider>
+            <FavoritesProvider>
+              <SearchProvider>
+                <App />
+              </SearchProvider>
+            </FavoritesProvider>
+          </AuthProvider>
+        </ConsentProvider>
       </CurrencyProvider>
     </LanguageProvider>
   </React.StrictMode>

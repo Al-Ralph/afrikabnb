@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { api } from "../../api/client";
-import { formatPrice } from "../../utils/format";
+import { useCurrency } from "../../context/CurrencyContext";
 import MapListingList from "./MapListingList";
 import Icon from "../Icons";
 import "./GoogleListingsMap.css";
@@ -30,7 +30,8 @@ function priceIcon(g, text, active) {
 
 // Carte Google Maps (le script doit déjà être chargé, avec consentement) + liste synchronisée.
 const GoogleListingsMap = ({ filters }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const { formatAmount } = useCurrency();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(new Map());
@@ -140,7 +141,7 @@ const GoogleListingsMap = ({ filters }) => {
     visible.forEach((listing) => {
       const id = String(listing.id);
       const active = selectedId != null && String(selectedId) === id;
-      const text = formatPrice(listing.price, listing.currency, language);
+      const text = formatAmount(listing.price, listing.currency);
       const label = { text, fontSize: "12px", fontWeight: "700", color: active ? "#ffffff" : "#222222" };
       let marker = markers.get(id);
       if (!marker) {
@@ -156,7 +157,7 @@ const GoogleListingsMap = ({ filters }) => {
       marker.setLabel(label);
       marker.setZIndex(active ? 1000 : 1);
     });
-  }, [listings, selectedId, language]);
+  }, [listings, selectedId, formatAmount]);
 
   const selectFromList = useCallback((id) => setSelectedId(id), []);
 
@@ -181,7 +182,7 @@ const GoogleListingsMap = ({ filters }) => {
               <p className="gmap-preview-title">{selected.title}</p>
               <p className="gmap-preview-location">{selected.location}</p>
               <p className="gmap-preview-price">
-                <strong>{formatPrice(selected.price, selected.currency, language)}</strong> / {t("common.night")}
+                <strong>{formatAmount(selected.price, selected.currency)}</strong> / {t("common.night")}
               </p>
               <Link to={`/property/${selected.id}`} className="gmap-preview-link">
                 {t("map.viewListing")}

@@ -1,21 +1,33 @@
 import * as bookingsService from "../../services/bookings.js";
-import { bookingToJson } from "./bookings.serializers.js";
+import { bookingToJson, bookingWithContactToJson } from "./bookings.serializers.js";
 import { notifyBooking } from "./bookings.notifications.js";
+import { appLink } from "../../services/email/index.js";
 
-// POST /api/listings/:id/bookings
-// Réservation instantanée (instantBook) -> CONFIRMED ; sinon demande PENDING à valider par l'hôte.
+// Lien de suivi d'une réservation sans compte (page frontend /reservation/:token).
+export const guestManageUrl = (token) => appLink(`/reservation/${token}`);
+
+// POST /api/listings/:id/bookings (authentification facultative)
+// Connecté : réservation instantanée (instantBook) -> CONFIRMED ; sinon demande PENDING.
+// Sans compte : toujours PENDING ; la réponse contient `manageUrl` (lien de suivi, aussi envoyé
+// par e-mail) pour l'afficher sur l'écran de confirmation du même navigateur.
 export async function create(req, res, next) {
   try {
-    const { checkIn, checkOut, guests } = req.body;
-    const booking = await bookingsService.createBooking({
+    const { checkIn, checkOut, guests, contact } = req.body;
+    const { booking, accessToken } = await bookingsService.createBooking({
       listingId: req.params.id,
-      user: req.user,
+      user: req.userId ? { id: req.userId } : null,
       checkIn,
       checkOut,
       guests,
+      contact,
     });
-    res.status(201).json(bookingToJson(booking));
-    notifyBooking("created", booking.id, req.log);
+    const body = bookingWithContactToJson(booking);
+    if (accessToken) {
+      body.manageUrl = guestManageUrl(accessToken);
+      res.set("Cache-Control", "no-store");
+    }
+    res.status(201).json(body);
+    notifyBooking("created", booking.id, req.log, accessToken ? { manageUrl: body.manageUrl } : {});
   } catch (err) {
     next(err);
   }
@@ -34,7 +46,7 @@ export async function availability(req, res, next) {
 export async function cancel(req, res, next) {
   try {
     const outcome = await bookingsService.cancelBooking({ bookingId: req.params.id, user: req.user });
-    res.json(bookingToJson(outcome.booking));
+    res.json(bookingWithContactToJson(outcome.booking));
     if (outcome.changed) notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: outcome.by });
   } catch (err) {
     next(err);
@@ -45,7 +57,7 @@ export async function cancel(req, res, next) {
 export async function confirm(req, res, next) {
   try {
     const outcome = await bookingsService.confirmBooking({ bookingId: req.params.id, user: req.user });
-    res.json(bookingToJson(outcome.booking));
+    res.json(bookingWithContactToJson(outcome.booking));
     if (outcome.changed) notifyBooking("accepted", outcome.booking.id, req.log);
   } catch (err) {
     next(err);
@@ -56,7 +68,7 @@ export async function confirm(req, res, next) {
 export async function decline(req, res, next) {
   try {
     const outcome = await bookingsService.declineBooking({ bookingId: req.params.id, user: req.user });
-    res.json(bookingToJson(outcome.booking));
+    res.json(bookingWithContactToJson(outcome.booking));
     if (outcome.changed) notifyBooking("declined", outcome.booking.id, req.log);
   } catch (err) {
     next(err);
@@ -67,7 +79,27 @@ export async function decline(req, res, next) {
 export async function listMine(req, res, next) {
   try {
     const bookings = await bookingsService.listGuestBookings(req.user.id);
-    res.json({ data: bookings.map((b) => bookingToJson(b)) });
+    res.json({ data: bookings.map((b) => bookingWithContactToJson(b)) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/guest-bookings/:token : suivi d'une réservation sans compte (sans fiche de contact).
+export async function getGuest(req, res, next) {
+  try {
+    res.json(bookingToJson(await bookingsService.getGuestBooking({ token: req.params.token })));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/guest-bookings/:token/cancel : annulation par le voyageur sans compte.
+export async function cancelGuest(req, res, next) {
+  try {
+    const outcome = await bookingsService.cancelGuestBooking({ token: req.params.token });
+    res.json(bookingToJson(outcome.booking));
+    if (outcome.changed) notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: "guest" });
   } catch (err) {
     next(err);
   }

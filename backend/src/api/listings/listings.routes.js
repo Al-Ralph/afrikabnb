@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import * as listingsController from "./listings.controller.js";
 import * as bookingsController from "../bookings/bookings.controller.js";
+import { createBookingSchema, limitAnonymousBookings, rejectHoneypot } from "../bookings/bookings.schemas.js";
 import * as reviewsController from "../reviews/reviews.controller.js";
 import * as favoritesController from "../favorites/favorites.controller.js";
 import * as imagesController from "./images.controller.js";
@@ -59,25 +60,6 @@ const listQuerySchema = z
     offset: z.coerce.number().int().min(0).default(0),
   })
   .refine(...stayOrderRefinement);
-
-const createBookingSchema = z
-  .object({
-    checkIn: day,
-    checkOut: day,
-    guests: z.number().int().min(1).max(50),
-  })
-  .strict()
-  .superRefine((d, ctx) => {
-    if (d.checkIn < todayDay()) {
-      ctx.addIssue({ code: "custom", path: ["checkIn"], message: "checkIn ne peut pas être dans le passé" });
-    }
-    const nights = nightsBetween(d.checkIn, d.checkOut);
-    if (nights < 1) {
-      ctx.addIssue({ code: "custom", path: ["checkOut"], message: "checkOut doit être postérieur à checkIn" });
-    } else if (nights > MAX_NIGHTS) {
-      ctx.addIssue({ code: "custom", path: ["checkOut"], message: `Séjour limité à ${MAX_NIGHTS} nuits` });
-    }
-  });
 
 const availabilityQuerySchema = z
   .object({ from: day.optional(), to: day.optional() })
@@ -140,11 +122,14 @@ router.delete("/:id", authenticateToken, listingsController.remove);
 router.post("/:id/favorite", authenticateToken, favoritesController.add);
 router.delete("/:id/favorite", authenticateToken, favoritesController.remove);
 
-// Validation avant authentification : un corps invalide est rejeté (400) sans requête en base.
+// Réservation connectée ou sans compte. Ordre : champ piège (400 générique), validation du corps
+// (400 sans requête en base), authentification facultative, limite des réservations sans compte.
 router.post(
   "/:id/bookings",
+  rejectHoneypot,
   validate(createBookingSchema),
-  authenticateToken,
+  optionalAuth,
+  limitAnonymousBookings,
   bookingsController.create
 );
 router.get(

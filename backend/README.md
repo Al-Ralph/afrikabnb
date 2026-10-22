@@ -48,7 +48,7 @@ En `local` (développement), les fichiers vont dans `backend/uploads/` (ignoré 
 
 ### Emails (Resend)
 
-Créer un compte [Resend](https://resend.com), vérifier un domaine d’envoi, créer une clé API → `RESEND_API_KEY`, `EMAIL_FROM="AfrikaBnB <no-reply@votre-domaine>"`, `EMAIL_DRIVER=resend`. Les emails partent **après** le commit de la transaction, sans bloquer la réponse HTTP : un échec est journalisé (`[email] échec d'envoi`), jamais renvoyé au client. Gabarits FR (texte + HTML, tout contenu utilisateur échappé) dans `src/services/email/templates.js`.
+Créer un compte [Resend](https://resend.com), vérifier un domaine d’envoi, créer une clé API → `RESEND_API_KEY`, `EMAIL_FROM="AfrikaBnB <no-reply@votre-domaine>"`, `EMAIL_DRIVER=resend`. Les notifications de réservation vont à l’adresse du compte du voyageur, ou à `contactEmail` pour une réservation sans compte (le lien de suivi `${APP_URL}/reservation/<jeton>` n’apparaît que dans le premier e-mail : seul le hash est conservé ensuite). Les emails partent **après** le commit de la transaction, sans bloquer la réponse HTTP : un échec est journalisé (`[email] échec d'envoi`), jamais renvoyé au client. Gabarits FR (texte + HTML, tout contenu utilisateur échappé) dans `src/services/email/templates.js`.
 
 ## Base de données Supabase
 
@@ -161,6 +161,7 @@ Les migrations sont versionnées dans `prisma/migrations/` (`migration_lock.toml
 | `20261022180000_vague3` | enums `ListingStatus`, `Amenity` ; `BookingStatus` + `DECLINED`, `EXPIRED` (`ALTER TYPE … ADD VALUE`, compatible avec une base non vide) ; `User.passwordChangedAt` ; `Listing.amenities` (défaut `{}`), `instantBook` (défaut `true`), `status` (défaut `ACTIVE`) ; tables `ListingImage`, `BlockedPeriod`, `PasswordResetToken` (cascade, index, RLS activée) ; **reprise** de chaque `Listing.imageUrl` existant en `ListingImage` position 0 |
 
 | `20261022200000_refresh_tokens` | table `RefreshToken` (`tokenHash` SHA-256 unique, `familyId`, `expiresAt`, `revokedAt`, `replacedById`, `userAgent` ; index `userId` et `familyId` ; cascade à la suppression de l’utilisateur ; RLS activée). Aucune ligne existante modifiée |
+| `20261022220000_guest_checkout` | réservation sans compte : `Booking.guestId` devient nullable (`DROP NOT NULL`, clé étrangère et cascade inchangées) ; colonnes nullable `contactName` (100), `contactEmail` (254), `contactPhone` (32), `contactCountry` (2), `arrivalTime` (5), `messageToHost` (1000), `guestAccessTokenHash` (`CHAR(64)`, unique), `guestAccessExpiresAt` ; index `contactEmail`. **Reprise** : `contactName` / `contactEmail` (minuscules) remplis depuis `User` pour les réservations existantes. Additive, sans perte |
 
 Application de la migration vague 3 (à faire une fois, avec `DIRECT_URL`) :
 
@@ -208,13 +209,14 @@ Logs structurés avec **pino** / **pino-http** (`src/config/logger.js`) : sortie
 npm test   # node --test, sans base de données
 ```
 
-Sessions : jetons de renouvellement (hash, rotation, détection de réutilisation et rotations concurrentes sur un dépôt en mémoire, révocation par changement de mot de passe), options et en-tête `Set-Cookie` réel du cookie, analyse de l’en-tête `Cookie`, exigence de `X-Requested-With`, `/refresh`, `/logout`, `/logout-all`, configuration (`Secure` selon l’environnement, durées, pas de `*` en CORS). Logique pure (nuits, prix, chevauchement, moyenne des notes, filtres / tri / équipements, codes d’erreur), statuts de réservation (PENDING, expiration 48 h, transitions, chevauchement avec les périodes bloquées), signatures d’images (magic bytes), jetons de réinitialisation (hash, expiration, usage unique, comparaison à temps constant), révocation des JWT par `passwordChangedAt` (middleware `authenticateToken`), gabarits d’emails (échappement HTML), `requireRole`, occupation et statistiques hôte.
+Sessions : jetons de renouvellement (hash, rotation, détection de réutilisation et rotations concurrentes sur un dépôt en mémoire, révocation par changement de mot de passe), options et en-tête `Set-Cookie` réel du cookie, analyse de l’en-tête `Cookie`, exigence de `X-Requested-With`, `/refresh`, `/logout`, `/logout-all`, configuration (`Secure` selon l’environnement, durées, pas de `*` en CORS). Logique pure (nuits, prix, chevauchement, moyenne des notes, filtres / tri / équipements, codes d’erreur), statuts de réservation (PENDING, expiration 48 h, transitions, chevauchement avec les périodes bloquées), signatures d’images (magic bytes), jetons de réinitialisation (hash, expiration, usage unique, comparaison à temps constant), réservation sans compte (`test/guestCheckout.test.js` : toujours `PENDING`, quota par e-mail, champ piège, `acceptTerms`, validation du contact, jeton haché, suivi / annulation par jeton, sérialisation hôte avec contact vs publique sans contact, e-mails, masquage des logs), révocation des JWT par `passwordChangedAt` (middleware `authenticateToken`), gabarits d’emails (échappement HTML), `requireRole`, occupation et statistiques hôte.
 
 ## Sécurité
 
 - `helmet`, `x-powered-by` désactivé, corps JSON limité à 100 ko.
 - Rate limiting : 300 req / 15 min sur `/api`, 10 req / 15 min (compteur partagé) sur `/api/auth/login` + `/api/auth/register`, 30 req / min sur `/api/maps/geocode` + `/api/maps/reverse` (proxy Nominatim ; `listings-in-bounds` n’interroge que la base et reste soumis à la limite générale). Réponse `429`.
-- Rate limiting supplémentaire : 60 req / 15 min sur `/api/auth/refresh`, 5 req / 15 min sur `/api/auth/forgot-password`, 10 req / 15 min sur `/api/auth/reset-password`, 30 téléversements / 15 min sur `POST /api/listings/:id/images`.
+- Rate limiting supplémentaire : 60 req / 15 min sur `/api/auth/refresh`, 5 req / 15 min sur `/api/auth/forgot-password`, 10 req / 15 min sur `/api/auth/reset-password`, 30 téléversements / 15 min sur `POST /api/listings/:id/images`, 30 req / 15 min sur `/api/guest-bookings`, 5 réservations **sans compte** créées / heure / IP sur `POST /api/listings/:id/bookings` (requêtes en échec non décomptées ; appliqué après l’authentification facultative : un faux en-tête `Authorization` ne le contourne pas).
+- Réservation sans compte : voir « Réservations » (jeton haché, champ piège, quota par e-mail). Le jeton du lien de suivi est masqué dans les logs (`/api/guest-bookings/[masqué]`).
 - Mots de passe : bcrypt 12 rounds. Sessions : voir « Sessions » ci-dessous. Un JWT émis avant `User.passwordChangedAt` est refusé (`401`) ; la réinitialisation et le changement de mot de passe révoquent aussi tous les jetons de renouvellement.
 - Téléversement : token vérifié (signature, sans base) → réception multipart en mémoire (5 Mo / fichier, 10 fichiers, champs limités) → type réel vérifié par signature binaire (JPEG, PNG, WebP ; extension et mimetype ignorés) → utilisateur en base → `sharp` (rotation EXIF, **métadonnées supprimées** dont GPS, 1600 px max, WebP qualité 80, 40 Mpx max en entrée).
 - Validation `zod` de toutes les entrées (champs inconnus refusés) : `400 { error, details: [{ path, message }] }`.
@@ -293,7 +295,7 @@ Objet **Listing** renvoyé :
   Exemple : `/api/listings?where=lome&categoryId=bord-mer&pets=1&guests=2&checkIn=2026-11-01&checkOut=2026-11-04`
 - `GET /api/listings/:id` – détail (`404` si absente)
 - `GET /api/listings/mine` – (auth) mes annonces : `{ data: [Listing + "upcomingBookings"] }` (réservations non annulées en cours ou à venir)
-- `GET /api/listings/mine/bookings` – (auth) réservations reçues sur mes annonces : `{ data: [Booking] }` avec `guest { id, name, avatar }` et `listing { id, title, location, imageUrl, currency, instantBook }`
+- `GET /api/listings/mine/bookings` – (auth) réservations reçues sur mes annonces : `{ data: [Booking] }` avec `guest { id, name, avatar }` (`null` sans compte), `listing { id, title, location, imageUrl, currency, instantBook }`, `guestAccount` et la fiche `contact` du voyageur
 - `GET /api/listings/mine/stats` – (auth) tableau de bord hôte :
   ```json
   {
@@ -342,19 +344,33 @@ Objet **Booking** :
 }
 ```
 
+`guestId` vaut `null` pour une réservation **sans compte**. La **fiche de contact** — `"guestAccount": true|false, "contact": { name, email, phone, country, arrivalTime, message }` (`contact: null` pour une réservation antérieure sans fiche) — n’est renvoyée **qu’à l’hôte de l’annonce** (`/api/listings/mine/bookings`, `upcomingArrivals` de `/mine/stats`) et au voyageur lui-même (création, `/api/users/me/bookings`, réponses de `cancel` / `confirm` / `decline`, dont l’auteur est forcément l’hôte ou le voyageur). Toute autre sérialisation (dont `/api/guest-bookings/:token`) l’omet ; l’empreinte du jeton d’accès n’est jamais exposée.
+
 `canReview` = réservation `CONFIRMED`, date de départ atteinte et pas encore d’avis. `expiresAt` : fin du délai de réponse de l’hôte (`PENDING` uniquement, sinon `null`).
 
 Statuts : `CONFIRMED` (réservation instantanée ou acceptée), `PENDING` (demande en attente : annonce `instantBook: false`), `DECLINED` (refusée par l’hôte), `EXPIRED` (sans réponse), `CANCELLED`. `PENDING` et `CONFIRMED` bloquent les dates ; `CANCELLED`, `DECLINED`, `EXPIRED` les libèrent.
 
 **Expiration (choix : statut calculé + persistance paresseuse)** : une demande `PENDING` est expirée 48 h après sa création, ou dès que son jour d’arrivée est passé. Le statut renvoyé par l’API et les filtres de disponibilité appliquent cette règle à la lecture (`src/utils/bookingStatus.js`) : le résultat est exact sans tâche planifiée. La valeur `EXPIRED` est ensuite écrite en base quand la demande est touchée (accepter / refuser / annuler → `409` « Cette demande a expiré ») et par un `updateMany` lors de la lecture des listes de réservations (voyageur ou hôte). Pas de cron à exploiter ; la base peut contenir des `PENDING` périmées entre deux lectures, sans effet sur l’API.
 
-- `POST /api/listings/:id/bookings` – (auth) réserver → `201 Booking`
-  Body : `{ "checkIn": "2026-11-01", "checkOut": "2026-11-04", "guests": 2 }`
+- `POST /api/listings/:id/bookings` – (authentification **facultative**) réserver → `201 Booking` (avec `contact`)
+  Body :
+  ```json
+  {
+    "checkIn": "2026-11-01", "checkOut": "2026-11-04", "guests": 2,
+    "contact": { "name": "Ama Mensah", "email": "ama@example.com", "phone": "+228 90 00 00 00", "country": "TG", "arrivalTime": "15:30", "message": "Arrivée en taxi" },
+    "acceptTerms": true,
+    "website": ""
+  }
+  ```
+  `contact` obligatoire (connecté ou non ; le frontend le pré-remplit pour un membre) : `name` 2–100 caractères sans caractère de contrôle, `email` (≤ 254, normalisé en minuscules), `phone` (≤ 32 : chiffres, espaces, `+` initial, `.-()`, 6 à 15 chiffres), `country` (ISO 3166-1 alpha-2), `arrivalTime?` (`HH:MM`), `message?` (≤ 1000). `acceptTerms: true` obligatoire (CGU + transmission des coordonnées à l’hôte). `website` : **champ piège** anti-robot, vide ou absent, sinon `400 { "error": "Requête invalide" }` (générique, sans détail, avant toute validation ou accès à la base).
+  **Sans compte** : toujours `PENDING` (l’hôte valide, même si `instantBook`), 60 nuits max, 3 demandes `PENDING` actives max **par adresse e-mail** (`429` ; verrou consultatif `pg_advisory_xact_lock(hashtext(email))` contre les envois simultanés), 5 réservations / heure / IP. Un jeton aléatoire de 32 octets (base64url) est créé ; seul son SHA-256 est stocké (`guestAccessTokenHash`), valable jusqu’au départ + 30 jours. La réponse contient alors `"manageUrl": "${APP_URL}/reservation/<jeton>"` (`Cache-Control: no-store`). **Choix** : le lien part aussi par e-mail ; l’afficher sur l’écran de confirmation du navigateur qui vient de réserver ne donne à ce navigateur que l’accès à la demande qu’il vient lui-même de créer. La possession de l’adresse e-mail n’est donc pas prouvée : la réservation reste une demande que l’hôte valide. Une réservation sans compte n’est jamais rattachée à un compte existant ayant la même adresse.
   Contrôles : dates `YYYY-MM-DD` valides, `checkOut > checkIn`, `checkIn ≥ aujourd’hui`, ≤ 365 nuits, `guests` 1–50 (`400`) ; `guests ≤ maxGuests` (`400`) ; pas sa propre annonce (`403`) ; annonce inexistante ou masquée (`404`) ; chevauchement avec une réservation bloquante ou une période bloquée → `409 { "error": "Ces dates ne sont pas disponibles" }`.
-  Annonce `instantBook: true` → `status: "CONFIRMED"` (emails : voyageur + hôte) ; `false` → `status: "PENDING"` (email : demande à l’hôte).
+  Connecté : annonce `instantBook: true` → `status: "CONFIRMED"` (e-mails : voyageur + hôte) ; `false` → `status: "PENDING"` (e-mails : récapitulatif au voyageur, demande à l’hôte). L’e-mail à l’hôte contient la **fiche de contact** (marquée « saisie par le voyageur », et « sans compte, non vérifiée » le cas échéant).
   `totalPrice = nuits × pricePerNight`. Le contrôle et l’insertion sont faits dans une transaction qui verrouille la ligne de l’annonce (`SELECT … FOR UPDATE`) : pas de double réservation concurrente.
 - `GET /api/listings/:id/availability?from=YYYY-MM-DD&to=YYYY-MM-DD` – nuits indisponibles (sans info personnelle). Défaut : `from` = aujourd’hui, `to` = `from` + 365 j (période ≤ 730 j). `404` si l’annonce est masquée.
   Réponse : `{ "listingId", "from", "to", "booked": [{ "checkIn", "checkOut" }], "blocked": [{ "startDate", "endDate" }] }` — `booked` contient les réservations bloquantes **et** les périodes bloquées (un calendrier qui ne lit que `booked` reste correct) ; `blocked` : périodes bloquées seules, sans la raison.
+- `GET /api/guest-bookings/:token` – (sans compte, jeton du lien de suivi) → `Booking` avec `listing` publique (hôte `{ id, name, avatar }`, jamais son e-mail), **sans** fiche de contact. Jeton mal formé, inconnu ou expiré → `404 { "error": "Réservation introuvable" }`. Réponses avec `Referrer-Policy: no-referrer` et `Cache-Control: no-store` ; 30 req / 15 min.
+- `POST /api/guest-bookings/:token/cancel` – annulation par le voyageur sans compte, **mêmes règles** que `PATCH /api/bookings/:id/cancel` (`409` si séjour commencé, demande expirée ou refusée ; idempotent) → `Booking`. E-mails : voyageur (adresse de la fiche) + hôte.
 - `PATCH /api/bookings/:id/cancel` – (auth, voyageur ou hôte de l’annonce, sinon `403`) → `Booking` avec `status: "CANCELLED"` (`CONFIRMED` ou `PENDING`). Idempotent ; `409` si le séjour a déjà commencé (`checkIn ≤ aujourd’hui`), si la demande a expiré ou a été refusée. Emails : voyageur + hôte.
 - `PATCH /api/bookings/:id/confirm` – (auth, hôte de l’annonce, sinon `403`) demande `PENDING` → `CONFIRMED` (email au voyageur et à l’hôte). `409` si expirée (persistée `EXPIRED`), déjà traitée ou dates devenues indisponibles.
 - `PATCH /api/bookings/:id/decline` – (auth, hôte) `PENDING` → `DECLINED` (email au voyageur). Mêmes `409`.

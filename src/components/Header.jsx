@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import LanguageSelector from "./LanguageSelector";
+import CurrencySelector from "./CurrencySelector";
 import ThemeToggle from "./ThemeToggle";
 import AuthModal from "./AuthModal";
 import "./Header.css";
@@ -142,6 +143,7 @@ const Header = () => {
             <Link to="/host" className="header-link">{t("header.becomeHost")}</Link>
             <ThemeToggle />
             <LanguageSelector />
+            <CurrencySelector />
             {user ? (
               <div className="header-user-menu-wrap" ref={menuRef}>
                 <button

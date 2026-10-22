@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth, OPEN_AUTH_EVENT } from "../../context/AuthContext";
 import { useSearch } from "../../context/SearchContext";
+import { useCurrency } from "../../context/CurrencyContext";
 import { api, toIsoDay } from "../../api/client";
 import DatePickerPanel from "../DatePickerPanel";
-import { formatPrice, formatDay, nightsBetween } from "../../utils/format";
+import { formatDay, nightsBetween } from "../../utils/format";
 import "./BookingWidget.css";
 
 // Événement écouté par AuthProvider pour ouvrir la fenêtre de connexion.
@@ -19,12 +20,20 @@ const startOfToday = () => {
 
 const isValidDate = (d) => d instanceof Date && !Number.isNaN(d.getTime());
 
+// Étape de réservation (formulaire de coordonnées, avec ou sans compte).
+export const checkoutPath = (listingId, { checkIn, checkOut, guests }) => {
+  const params = new URLSearchParams({ checkIn: toIsoDay(checkIn), checkOut: toIsoDay(checkOut), guests: String(guests) });
+  return `/reserver/${encodeURIComponent(listingId)}?${params}`;
+};
+
 // Une plage réservée [checkIn, checkOut[ chevauche-t-elle les nuits [from, to[ ?
 const overlaps = (booked, fromIso, toIso) => booked.some((b) => b.checkIn < toIso && b.checkOut > fromIso);
 
 const BookingWidget = ({ listing, demo = false }) => {
   const { t, language } = useLanguage();
   const { user } = useAuth();
+  const { formatAmount } = useCurrency();
+  const navigate = useNavigate();
   const { appliedSearch } = useSearch();
   const widgetRef = useRef(null);
   const mountedRef = useRef(true);
@@ -50,9 +59,7 @@ const BookingWidget = ({ listing, demo = false }) => {
   });
   const [booked, setBooked] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [confirmation, setConfirmation] = useState(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -97,14 +104,12 @@ const BookingWidget = ({ listing, demo = false }) => {
   const handleCheckOut = (date) => {
     setCheckOut(date);
     setFeedback(null);
-    setConfirmation(null);
     if (date) setPickerOpen(false);
   };
 
   const handleCheckIn = (date) => {
     setCheckIn(date);
     setFeedback(null);
-    setConfirmation(null);
   };
 
   const clearDates = () => {
@@ -113,40 +118,15 @@ const BookingWidget = ({ listing, demo = false }) => {
     setFeedback(null);
   };
 
-  const openAuth = () => window.dispatchEvent(new CustomEvent(OPEN_AUTH_EVENT));
-
-  const handleSubmit = async (e) => {
+  // Réserver ouvre l'étape de réservation (coordonnées transmises à l'hôte), avec ou sans compte.
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setConfirmation(null);
-    if (!user) {
-      setFeedback({ type: "login" });
-      return;
-    }
     if (nights <= 0) {
       setFeedback({ type: "error", message: t("booking.selectDates") });
       setPickerOpen(true);
       return;
     }
-    setSubmitting(true);
-    setFeedback(null);
-    try {
-      const booking = await api.createBooking(listing.id, { checkIn, checkOut, guests });
-      if (!mountedRef.current) return;
-      setConfirmation(booking);
-      loadAvailability();
-    } catch (err) {
-      if (!mountedRef.current) return;
-      if (err?.status === 409) {
-        setFeedback({ type: "error", message: t("booking.unavailable") });
-        loadAvailability();
-      } else if (err?.status === 401) {
-        setFeedback({ type: "login" });
-      } else {
-        setFeedback({ type: "error", message: err?.message || t("booking.genericError") });
-      }
-    } finally {
-      if (mountedRef.current) setSubmitting(false);
-    }
+    navigate(checkoutPath(listing.id, { checkIn, checkOut, guests }), { state: { listing } });
   };
 
   const scrollToWidget = () => {
@@ -154,7 +134,7 @@ const BookingWidget = ({ listing, demo = false }) => {
     if (!demo && nights <= 0) setPickerOpen(true);
   };
 
-  const pricePerNight = formatPrice(price, currency, language);
+  const pricePerNight = formatAmount(price, currency);
 
   return (
     <>
@@ -244,11 +224,11 @@ const BookingWidget = ({ listing, demo = false }) => {
                   <dt>
                     {pricePerNight} × {nights} {nights > 1 ? t("booking.nights") : t("booking.night")}
                   </dt>
-                  <dd>{formatPrice(total, currency, language)}</dd>
+                  <dd>{formatAmount(total, currency)}</dd>
                 </div>
                 <div className="booking-widget-total">
                   <dt>{t("booking.total")}</dt>
-                  <dd data-testid="booking-total">{formatPrice(total, currency, language)}</dd>
+                  <dd data-testid="booking-total">{formatAmount(total, currency)}</dd>
                 </div>
               </dl>
             )}
@@ -262,42 +242,15 @@ const BookingWidget = ({ listing, demo = false }) => {
             {isOwner ? (
               <p className="booking-widget-note">{t("booking.ownListing")}</p>
             ) : (
-              <button type="submit" className="booking-widget-submit" disabled={submitting || datesConflict}>
-                {submitting
-                  ? t(onRequest ? "bookingRequest.submitting" : "booking.submitting")
-                  : t(onRequest ? "bookingRequest.submit" : "booking.reserve")}
+              <button type="submit" className="booking-widget-submit" disabled={datesConflict}>
+                {t(onRequest ? "bookingRequest.submit" : "booking.reserve")}
               </button>
             )}
 
-            {feedback?.type === "login" && (
-              <div className="booking-widget-login" role="alert">
-                <p>{t("booking.loginRequired")}</p>
-                <button type="button" className="booking-widget-login-btn" onClick={openAuth}>
-                  {t("booking.loginCta")}
-                </button>
-              </div>
-            )}
             {feedback?.type === "error" && !datesConflict && (
               <p className="booking-widget-error" role="alert">
                 {feedback.message}
               </p>
-            )}
-            {confirmation && (
-              <div className="booking-widget-success" role="status">
-                <p>
-                  <strong>
-                    {confirmation.status === "PENDING" ? t("bookingRequest.sentTitle") : t("booking.confirmed")}
-                  </strong>
-                </p>
-                {confirmation.status === "PENDING" && <p>{t("bookingRequest.sentText")}</p>}
-                <p>
-                  {formatDay(confirmation.checkIn, language)} → {formatDay(confirmation.checkOut, language)} ·{" "}
-                  {formatPrice(confirmation.totalPrice, confirmation.currency || currency, language)}
-                </p>
-                <Link to="/profil" className="booking-widget-success-link">
-                  {t("booking.viewMyBookings")}
-                </Link>
-              </div>
             )}
             <p className="booking-widget-hint">{t("booking.noCharge")}</p>
           </form>
@@ -306,7 +259,7 @@ const BookingWidget = ({ listing, demo = false }) => {
 
       <div className="booking-mobile-bar">
         <span className="booking-mobile-bar-price">
-          <strong>{nights > 0 ? formatPrice(total, currency, language) : pricePerNight}</strong>
+          <strong>{nights > 0 ? formatAmount(total, currency) : pricePerNight}</strong>
           <span>
             {nights > 0
               ? ` · ${nights} ${nights > 1 ? t("booking.nights") : t("booking.night")}`

@@ -56,6 +56,16 @@ export default defineConfig({
             },
           },
           {
+            // Taux de change d'affichage : publics et identiques pour tous (mis à jour 1 fois/jour).
+            urlPattern: ({ url, request }) => request.method === "GET" && url.pathname === "/api/rates",
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "api-rates",
+              expiration: { maxEntries: 1, maxAgeSeconds: 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             urlPattern: ({ url }) => url.hostname === "images.unsplash.com",
             handler: "CacheFirst",
             options: {

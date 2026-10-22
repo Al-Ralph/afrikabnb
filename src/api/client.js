@@ -317,6 +317,11 @@ export const api = {
     return results || [];
   },
 
+  // Taux d'affichage { base: "XOF", rates: { EUR, USD, … }, updatedAt, source } (public, sans jeton).
+  async getRates() {
+    return request("/api/rates", { auth: false });
+  },
+
   // --- Profil ---
   async updateProfile(data) {
     // credentials : un changement de mot de passe pose un nouveau cookie de session.
@@ -423,10 +428,31 @@ export const api = {
     return (data || []).map(normalizeBooking);
   },
 
-  async createBooking(listingId, { checkIn, checkOut, guests }) {
-    const body = { checkIn: toIsoDay(checkIn), checkOut: toIsoDay(checkOut), guests: Number(guests) };
+  // Réservation connectée ou sans compte (même formulaire) : contact { name, email, phone, country,
+  // arrivalTime?, message? }, acceptTerms: true, website (champ piège, vide). Sans compte, la réponse
+  // contient manageUrl (lien de suivi, aussi envoyé par e-mail). 409 dates prises, 429 quota.
+  async createBooking(listingId, { checkIn, checkOut, guests, contact, acceptTerms, website = "" }) {
+    const body = {
+      checkIn: toIsoDay(checkIn),
+      checkOut: toIsoDay(checkOut),
+      guests: Number(guests),
+      contact,
+      acceptTerms,
+      website,
+    };
     return normalizeBooking(
       await request(`/api/listings/${enc(listingId)}/bookings`, jsonBody("POST", body))
+    );
+  },
+
+  // Réservation sans compte, par le jeton du lien de suivi (404 si inconnu ou expiré).
+  async getGuestBooking(token) {
+    return normalizeBooking(await request(`/api/guest-bookings/${enc(token)}`, { auth: false }));
+  },
+
+  async cancelGuestBooking(token) {
+    return normalizeBooking(
+      await request(`/api/guest-bookings/${enc(token)}/cancel`, { method: "POST", auth: false })
     );
   },
 

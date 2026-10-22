@@ -8,9 +8,20 @@ process.env.NODE_ENV = "test";
 process.env.STORAGE_DRIVER = "local";
 process.env.EMAIL_DRIVER = "console";
 
-const { createBooking, confirmBooking, declineBooking, cancelBooking, getAvailability } = await import(
-  "../src/services/bookings.js"
-);
+const {
+  createBooking: createBookingWithToken,
+  confirmBooking,
+  declineBooking,
+  cancelBooking,
+  cancelGuestBooking,
+  getAvailability,
+  getGuestBooking,
+} = await import("../src/services/bookings.js");
+const { bookingToJson, bookingWithContactToJson } = await import("../src/api/bookings/bookings.serializers.js");
+const { hashGuestAccessToken } = await import("../src/utils/guestAccess.js");
+
+// Tests historiques (voyageur connecté) : seule la réservation créée est examinée.
+const createBooking = async (...args) => (await createBookingWithToken(...args)).booking;
 const { addDays, parseDay, todayDay } = await import("../src/utils/booking.js");
 
 const day = (n) => addDays(todayDay(), n);
@@ -28,13 +39,14 @@ async function rejects(promise, statusCode, message) {
 
 // Client Prisma factice pour createBooking : ligne Listing verrouillée, quota, chevauchements.
 function createDb({ listing, pendingCount = 0, bookings = [], blockedPeriods = [] } = {}) {
-  const calls = { queries: [], created: null, countWhere: null };
+  const calls = { queries: [], created: null, countWhere: null, lockKeys: [] };
   const tx = {
     $queryRaw: async (strings) => {
       const sql = strings.join("?");
       calls.queries.push(sql);
       return sql.includes('FROM "Listing"') ? (listing ? [listing] : []) : [{ id: guest.id }];
     },
+    $executeRaw: async (strings, ...values) => (calls.queries.push(strings.join("?")), calls.lockKeys.push(...values), 1),
     booking: {
       count: async ({ where }) => ((calls.countWhere = where), pendingCount),
       findMany: async () => bookings,
@@ -55,7 +67,15 @@ const activeListing = (over = {}) => ({
   ...over,
 });
 
-const stay = (checkIn, checkOut, guests = 2) => ({ listingId: "l1", user: guest, checkIn, checkOut, guests });
+const contact = {
+  name: "Ama Mensah",
+  email: "ama@example.com",
+  phone: "+228 90 00 00 00",
+  country: "TG",
+  arrivalTime: "15:30",
+  message: "Arrivée en taxi",
+};
+const stay = (checkIn, checkOut, guests = 2) => ({ listingId: "l1", user: guest, checkIn, checkOut, guests, contact });
 
 test("createBooking : réservation instantanée -> CONFIRMED, prix total, verrou FOR UPDATE de l'annonce", async () => {
   const { db, calls } = createDb({ listing: activeListing() });

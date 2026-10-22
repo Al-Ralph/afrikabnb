@@ -168,9 +168,10 @@ model Favorite {
 model Booking {
   id         String        @id @default(cuid())
   listingId  String
-  guestId    String
+  // null : réservation sans compte (voyageur identifié par sa fiche de contact et son jeton d'accès).
+  guestId    String?
   listing    Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  guest      User          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  guest      User?         @relation(fields: [guestId], references: [id], onDelete: Cascade)
   // Nuits occupées : [checkIn, checkOut[ (le jour du départ est libre pour une arrivée).
   checkIn    DateTime      @db.Date
   checkOut   DateTime      @db.Date
@@ -179,11 +180,27 @@ model Booking {
   status     BookingStatus @default(CONFIRMED)
   createdAt  DateTime      @default(now())
 
+  // Fiche de contact saisie par le voyageur, transmise à l'hôte de l'annonce uniquement.
+  // Nullable : réservations antérieures à la vague 4 (reprises depuis User par la migration).
+  contactName    String?   @db.VarChar(100)
+  // Normalisé en minuscules (quota des demandes sans compte par adresse).
+  contactEmail   String?   @db.VarChar(254)
+  contactPhone   String?   @db.VarChar(32)
+  // Code pays ISO 3166-1 alpha-2.
+  contactCountry String?   @db.VarChar(2)
+  // Heure d'arrivée estimée "HH:MM".
+  arrivalTime    String?   @db.VarChar(5)
+  messageToHost  String?   @db.VarChar(1000)
+  // Réservation sans compte : SHA-256 du jeton du lien de suivi (le jeton n'est jamais stocké).
+  guestAccessTokenHash String?   @unique @db.Char(64)
+  guestAccessExpiresAt DateTime?
+
   review Review?
 
   @@index([listingId, checkIn, checkOut])
   @@index([guestId])
   @@index([status, createdAt])
+  @@index([contactEmail])
 }
 
 model Review {
