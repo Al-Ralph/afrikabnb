@@ -1,0 +1,62 @@
+.theme-toggle {
+  position: relative;
+}
+
+.theme-toggle-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  min-width: 176px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text);
+  animation: theme-menu-in var(--dur) var(--ease-out);
+  transform-origin: top right;
+}
+
+@keyframes theme-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.theme-toggle-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-std);
+}
+
+.theme-toggle-option:hover {
+  background: var(--color-surface-2);
+}
+
+.theme-toggle-option--active {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.theme-toggle-option--active svg {
+  color: var(--color-primary);
+}
+
+.theme-toggle-option:focus-visible {
+  outline-offset: -2px;
+}

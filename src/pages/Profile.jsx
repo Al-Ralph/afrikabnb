@@ -5,6 +5,8 @@ import ProfileInfoForm from "../components/profile/ProfileInfoForm";
 import PasswordForm from "../components/profile/PasswordForm";
 import MyBookings from "../components/profile/MyBookings";
 import Footer from "../components/Footer";
+import EmptyState from "../components/EmptyState";
+import { ProfileSkeleton } from "../components/Skeleton";
 import "./Account.css";
 import "./Profile.css";
 
@@ -14,19 +16,20 @@ const Profile = () => {
 
   let content;
   if (loading) {
-    content = (
-      <div className="account-state" role="status" aria-live="polite">
-        <div className="account-spinner" aria-hidden="true" />
-      </div>
-    );
+    content = <ProfileSkeleton label={t("host.loading")} />;
   } else if (!user) {
     content = (
-      <div className="account-state">
+      <EmptyState
+        icon="user"
+        title={t("ui.profile.loginTitle")}
+        action={
+          <button type="button" className="btn btn--primary" onClick={openAuth}>
+            {t("profile.loginBtn")}
+          </button>
+        }
+      >
         <p>{t("profile.loginRequired")}</p>
-        <button type="button" className="account-btn account-btn-primary" onClick={openAuth}>
-          {t("profile.loginBtn")}
-        </button>
-      </div>
+      </EmptyState>
     );
   } else {
     content = (

@@ -64,7 +64,8 @@ describe("PropertyDetails", () => {
     expect(await screen.findByText("Villa Lagune")).toBeInTheDocument();
     expect(screen.getByText("4 voyageurs")).toBeInTheDocument();
     expect(screen.getByText("2 chambres")).toBeInTheDocument();
-    expect(screen.getByText("★ 4.5 · 3 avis")).toBeInTheDocument();
+    // L'étoile est une icône SVG décorative ; le texte porte la note et le nombre d'avis.
+    expect(screen.getByText("4.5 · 3 avis")).toBeInTheDocument();
     expect(screen.getByText("Awa")).toBeInTheDocument();
     expect(await screen.findByText("Aucun avis pour le moment.")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Réserver" }).length).toBeGreaterThan(0);
