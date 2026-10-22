@@ -1,6 +1,7 @@
 import prisma from "../config/db.js";
 import { verifyToken } from "../config/jwt.js";
 import { isTokenRevokedByPasswordChange } from "../utils/resetToken.js";
+import { hasAppHeader } from "../utils/refreshToken.js";
 
 function bearerToken(req) {
   const authHeader = req.headers.authorization;
@@ -19,9 +20,14 @@ function checkToken(req) {
   }
 }
 
+// 401 dû au jeton d'accès (absent, expiré, révoqué) : signalé par WWW-Authenticate (RFC 6750) pour
+// que le frontend tente un renouvellement, contrairement aux autres 401 (mot de passe actuel faux…).
+const tokenRejected = (res, error) =>
+  res.status(401).set("WWW-Authenticate", 'Bearer error="invalid_token"').json({ error });
+
 export const authenticateToken = async (req, res, next) => {
   const { payload, status, error } = checkToken(req);
-  if (!payload) return res.status(status).json({ error });
+  if (!payload) return status === 401 ? tokenRejected(res, error) : res.status(status).json({ error });
 
   try {
     const user = await prisma.user.findUnique({
@@ -29,11 +35,11 @@ export const authenticateToken = async (req, res, next) => {
       select: { id: true, email: true, name: true, avatar: true, role: true, passwordChangedAt: true },
     });
     if (!user) {
-      return res.status(401).json({ error: "Utilisateur introuvable" });
+      return tokenRejected(res, "Utilisateur introuvable");
     }
     // Token émis avant la dernière réinitialisation du mot de passe : révoqué.
     if (isTokenRevokedByPasswordChange(payload.iat, user.passwordChangedAt)) {
-      return res.status(401).json({ error: "Session expirée, reconnectez-vous" });
+      return tokenRejected(res, "Session expirée, reconnectez-vous");
     }
     const { passwordChangedAt: _, ...publicUser } = user;
     req.user = publicUser;
@@ -65,5 +71,13 @@ export const optionalAuth = async (req, res, next) => {
       }
     }
   }
+  next();
+};
+
+// Routes à cookie (/api/auth/refresh, /api/auth/logout) : exige X-Requested-With: afrikabnb.
+// Un formulaire ou une image d'un autre site ne peut pas poser cet en-tête ; un fetch inter-origine
+// qui le pose déclenche un preflight CORS refusé. Défense en plus de SameSite=Strict.
+export const requireAppHeader = (req, res, next) => {
+  if (!hasAppHeader(req)) return res.status(403).json({ error: "En-tête X-Requested-With requis" });
   next();
 };

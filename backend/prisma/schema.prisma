@@ -79,6 +79,7 @@ model User {
   bookings            Booking[]
   reviews             Review[]
   passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
 }
 
 model Listing {
@@ -212,4 +213,23 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+// Jeton de renouvellement de session (cookie httpOnly afrikabnb_rt) : seul le hash SHA-256 est
+// stocké. Rotation à chaque usage (l'ancien est révoqué, replacedById pointe vers le suivant) ;
+// un jeton révoqué présenté à nouveau révoque toute sa famille (détection de réutilisation).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @db.Char(64)
+  familyId     String    @db.VarChar(64)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?   @db.VarChar(255)
+
+  @@index([userId])
+  @@index([familyId])
 }

@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { api } from "../api/client";
 
-const TOKEN_KEY = "afrikabnb_token";
 export const OPEN_AUTH_EVENT = "afrikabnb:open-auth";
+// Émis par le client API quand la session ne peut plus être renouvelée (même valeur que
+// SESSION_EXPIRED_EVENT dans api/client.js).
+export const SESSION_EXPIRED_EVENT = "afrikabnb:session-expired";
 
 const AuthContext = createContext(null);
 
@@ -27,40 +29,60 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener(OPEN_AUTH_EVENT, onOpen);
   }, [openAuth]);
 
+  // Restauration de la session au chargement : le cookie httpOnly de renouvellement donne un
+  // nouveau jeton d'accès (gardé en mémoire par le client API). « loading » reste vrai pendant
+  // l'appel : pas d'affichage furtif du bouton de connexion.
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api
-      .getMe()
-      .then(({ user: u }) => setUser(u))
-      .catch((err) => {
-        // Token invalide/expiré uniquement : une panne réseau ou serveur ne déconnecte pas.
-        if (err?.status === 401 || err?.status === 403) localStorage.removeItem(TOKEN_KEY);
+    let active = true;
+    Promise.resolve()
+      .then(() => api.refreshSession())
+      .then((data) => {
+        if (active && data?.user) setUser(data.user);
       })
-      .finally(() => setLoading(false));
+      .catch(() => {
+        // Pas de session (401) ou API injoignable : visiteur anonyme.
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
+  // Renouvellement impossible pendant la navigation (session révoquée ou expirée) : déconnexion.
+  useEffect(() => {
+    const onExpired = () => setUser(null);
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
+  // Le client API garde le jeton d'accès en mémoire ; le cookie de renouvellement est posé par l'API.
   const login = async (email, password) => {
-    const { user: u, token } = await api.login(email, password);
-    localStorage.setItem(TOKEN_KEY, token);
+    const { user: u } = await api.login(email, password);
     setUser(u);
     return u;
   };
 
   const register = async (email, password, name) => {
-    const { user: u, token } = await api.register(email, password, name);
-    localStorage.setItem(TOKEN_KEY, token);
+    const { user: u } = await api.register(email, password, name);
     setUser(u);
     return u;
   };
 
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+  // Déconnexion locale immédiate ; la révocation côté API se fait en arrière-plan (échec ignoré).
+  const logout = useCallback(() => {
     setUser(null);
-  };
+    Promise.resolve()
+      .then(() => api.logout())
+      .catch(() => {});
+  }, []);
+
+  // Déconnexion de tous les appareils : rejette si l'API refuse (l'appelant affiche l'erreur).
+  const logoutAll = useCallback(async () => {
+    await api.logoutAll();
+    setUser(null);
+  }, []);
 
   // Profil modifié (nom, avatar…) : fusionne la réponse de l'API dans l'utilisateur courant.
   const updateUser = useCallback((patch) => {
@@ -69,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, updateUser, authOpen, authMode, openAuth, closeAuth }}
+      value={{ user, loading, login, register, logout, logoutAll, updateUser, authOpen, authMode, openAuth, closeAuth }}
     >
       {children}
     </AuthContext.Provider>

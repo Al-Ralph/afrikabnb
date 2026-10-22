@@ -1,0 +1,237 @@
+// Règles métier des réservations (création, disponibilités, transitions, listes).
+// Sans req/res : erreurs métier levées via httpError, client Prisma injectable (`db`).
+import { Prisma } from "@prisma/client";
+import prisma from "../config/db.js";
+import { listingBaseInclude } from "../api/listings/listings.serializers.js";
+import { httpError } from "../utils/httpError.js";
+import { MAX_AMOUNT, addDays, computeTotalPrice, formatDay, nightsBetween, parseDay, todayDay } from "../utils/booking.js";
+import {
+  MAX_PENDING_PER_GUEST,
+  MAX_REQUEST_NIGHTS,
+  activePendingWhere,
+  blockingBookingWhere,
+  expiredPendingWhere,
+  findStayConflict,
+  nextStatus,
+} from "../utils/bookingStatus.js";
+
+export const publicPerson = { select: { id: true, name: true, avatar: true } };
+
+// Vue voyageur : annonce complète + présence d'un avis.
+export const guestBookingInclude = {
+  listing: { include: listingBaseInclude },
+  review: { select: { id: true } },
+};
+
+// Vue hôte : voyageur (sans email) + résumé de l'annonce.
+export const hostBookingInclude = {
+  guest: publicPerson,
+  listing: {
+    select: { id: true, title: true, location: true, imageUrl: true, currency: true, instantBook: true },
+  },
+};
+
+// Persistance paresseuse des demandes expirées (voir utils/bookingStatus.js).
+export function sweepExpired(where, db = prisma) {
+  return db.booking.updateMany({ where: { ...where, ...expiredPendingWhere() }, data: { status: "EXPIRED" } });
+}
+
+// Réservations et périodes bloquées qui pourraient chevaucher [start, end[ (à affiner par findStayConflict).
+async function overlapping(tx, listingId, start, end) {
+  const [bookings, blockedPeriods] = await Promise.all([
+    tx.booking.findMany({
+      where: { listingId, status: { in: ["PENDING", "CONFIRMED"] }, checkIn: { lt: end }, checkOut: { gt: start } },
+      select: { id: true, status: true, createdAt: true, checkIn: true, checkOut: true },
+    }),
+    tx.blockedPeriod.findMany({
+      where: { listingId, startDate: { lt: end }, endDate: { gt: start } },
+      select: { id: true, startDate: true, endDate: true },
+    }),
+  ]);
+  return { bookings, blockedPeriods };
+}
+
+// Réservation instantanée (instantBook) -> CONFIRMED ; sinon demande PENDING à valider par l'hôte.
+// Retourne la réservation créée (include guestBookingInclude).
+export async function createBooking({ listingId, user, checkIn, checkOut, guests }, db = prisma) {
+  const nights = nightsBetween(checkIn, checkOut);
+  const start = parseDay(checkIn);
+  const end = parseDay(checkOut);
+
+  return db.$transaction(async (tx) => {
+    // Verrou de la ligne Listing : deux réservations concurrentes de la même annonce sont
+    // sérialisées, le contrôle de chevauchement ci-dessous ne peut donc pas être contourné.
+    const rows = await tx.$queryRaw`
+      SELECT "id", "hostId", "pricePerNight", "maxGuests", "instantBook", "status"::text AS "status"
+      FROM "Listing" WHERE "id" = ${listingId} FOR UPDATE`;
+    const listing = rows[0];
+    if (!listing || listing.status !== "ACTIVE") throw httpError(404, "Annonce introuvable");
+    if (listing.hostId === user.id) {
+      throw httpError(403, "Impossible de réserver sa propre annonce");
+    }
+    if (guests > Number(listing.maxGuests)) {
+      throw httpError(400, `Capacité maximale dépassée (${listing.maxGuests} voyageurs)`);
+    }
+    if (!listing.instantBook) {
+      if (nights > MAX_REQUEST_NIGHTS) {
+        throw httpError(400, `Une demande est limitée à ${MAX_REQUEST_NIGHTS} nuits (réservation instantanée non disponible pour cette annonce)`);
+      }
+      // Verrou du voyageur : deux demandes simultanées ne peuvent pas dépasser le quota.
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
+      const pending = await tx.booking.count({ where: { guestId: user.id, ...activePendingWhere() } });
+      if (pending >= MAX_PENDING_PER_GUEST) {
+        throw httpError(429, "Trop de demandes en attente : attendez la réponse des hôtes");
+      }
+    }
+    const totalPrice = computeTotalPrice(listing.pricePerNight, nights);
+    if (totalPrice > MAX_AMOUNT) throw httpError(400, "Montant total trop élevé");
+
+    const candidates = await overlapping(tx, listingId, start, end);
+    if (findStayConflict({ checkIn, checkOut, ...candidates })) {
+      throw httpError(409, "Ces dates ne sont pas disponibles");
+    }
+
+    return tx.booking.create({
+      data: {
+        listingId,
+        guestId: user.id,
+        checkIn: start,
+        checkOut: end,
+        guests,
+        totalPrice: new Prisma.Decimal(totalPrice.toFixed(2)),
+        status: listing.instantBook ? "CONFIRMED" : "PENDING",
+      },
+      include: guestBookingInclude,
+    });
+  });
+}
+
+// Nuits indisponibles, sans information personnelle.
+// `booked` : réservations bloquantes ET périodes bloquées par l'hôte (compatibilité : un calendrier
+// qui ne lit que `booked` désactive toutes les nuits indisponibles) ; `blocked` : blocages seuls.
+export async function getAvailability({ listingId, from, to }, db = prisma) {
+  from = from ?? todayDay();
+  to = to ?? addDays(from, 365);
+  if (to <= from) throw httpError(400, "`to` doit être postérieur à `from`");
+  const listing = await db.listing.findUnique({
+    where: { id: listingId },
+    select: { id: true, status: true },
+  });
+  if (!listing || listing.status !== "ACTIVE") throw httpError(404, "Annonce introuvable");
+  const [bookings, blocked] = await Promise.all([
+    db.booking.findMany({
+      where: {
+        listingId: listing.id,
+        ...blockingBookingWhere(),
+        checkIn: { lt: parseDay(to) },
+        checkOut: { gt: parseDay(from) },
+      },
+      select: { checkIn: true, checkOut: true },
+    }),
+    db.blockedPeriod.findMany({
+      where: { listingId: listing.id, startDate: { lt: parseDay(to) }, endDate: { gt: parseDay(from) } },
+      select: { startDate: true, endDate: true },
+    }),
+  ]);
+  const blockedRanges = blocked.map((p) => ({ checkIn: formatDay(p.startDate), checkOut: formatDay(p.endDate) }));
+  const booked = [
+    ...bookings.map((b) => ({ checkIn: formatDay(b.checkIn), checkOut: formatDay(b.checkOut) })),
+    ...blockedRanges,
+  ].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0));
+  return {
+    listingId: listing.id,
+    from,
+    to,
+    booked,
+    blocked: blockedRanges.map((r) => ({ startDate: r.checkIn, endDate: r.checkOut })),
+  };
+}
+
+// Applique une transition (cancel / confirm / decline) dans une transaction.
+// allowed(booking, user) -> message d'erreur 403 ou null.
+// Retourne { booking (rechargée pour la réponse), changed, by: "guest" | "host" }.
+async function transition(bookingId, user, action, allowed, db) {
+  const outcome = await db.$transaction(async (tx) => {
+    const found = await tx.booking.findUnique({
+      where: { id: bookingId },
+      include: { listing: { select: { hostId: true, status: true } } },
+    });
+    if (!found) throw httpError(404, "Réservation introuvable");
+    const forbidden = allowed(found, user);
+    if (forbidden) throw httpError(403, forbidden);
+    // Verrou de l'annonce, puis relecture : état à jour sous verrou.
+    await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${found.listingId} FOR UPDATE`;
+    const booking = await tx.booking.findUnique({ where: { id: found.id } });
+    const result = nextStatus(booking, action);
+    // Annonce masquée / suspendue : une demande ne peut plus être acceptée (le refus reste permis).
+    if (result.ok && action === "confirm" && found.listing.status !== "ACTIVE") {
+      throw httpError(409, "Annonce non active : impossible d'accepter cette demande");
+    }
+    if (!result.ok) {
+      if (result.expired && booking.status === "PENDING") {
+        await tx.booking.update({ where: { id: booking.id }, data: { status: "EXPIRED" } });
+      }
+      return { error: result };
+    }
+    if (result.unchanged) return { booking, changed: false, by: found.guestId === user.id ? "guest" : "host" };
+    if (result.status === "CONFIRMED") {
+      // Garde-fou : les dates d'une demande PENDING sont déjà réservées, sauf incohérence.
+      const candidates = await overlapping(tx, booking.listingId, booking.checkIn, booking.checkOut);
+      if (findStayConflict({ checkIn: booking.checkIn, checkOut: booking.checkOut, ...candidates, excludeBookingId: booking.id })) {
+        throw httpError(409, "Ces dates ne sont plus disponibles");
+      }
+    }
+    await tx.booking.update({ where: { id: booking.id }, data: { status: result.status } });
+    return { booking, changed: true, by: found.guestId === user.id ? "guest" : "host" };
+  });
+  // Erreur métier levée après le commit (persistance éventuelle de EXPIRED conservée).
+  if (outcome.error) throw httpError(outcome.error.code, outcome.error.error);
+  const updated = await db.booking.findUnique({
+    where: { id: outcome.booking.id },
+    include: { ...guestBookingInclude, guest: publicPerson },
+  });
+  return { booking: updated, changed: outcome.changed, by: outcome.by };
+}
+
+const hostOnly = (b, user) => (b.listing.hostId !== user.id ? "Seul l'hôte peut répondre à cette demande" : null);
+
+// Annulation par le voyageur ou l'hôte de l'annonce.
+export function cancelBooking({ bookingId, user }, db = prisma) {
+  return transition(
+    bookingId,
+    user,
+    "cancel",
+    (b, u) => (b.guestId !== u.id && b.listing.hostId !== u.id ? "Non autorisé à annuler cette réservation" : null),
+    db
+  );
+}
+
+// L'hôte accepte une demande PENDING (non expirée).
+export function confirmBooking({ bookingId, user }, db = prisma) {
+  return transition(bookingId, user, "confirm", hostOnly, db);
+}
+
+// L'hôte refuse une demande PENDING (non expirée).
+export function declineBooking({ bookingId, user }, db = prisma) {
+  return transition(bookingId, user, "decline", hostOnly, db);
+}
+
+// Réservations du voyageur (balayage des demandes expirées d'abord).
+export async function listGuestBookings(userId, db = prisma) {
+  await sweepExpired({ guestId: userId }, db);
+  return db.booking.findMany({
+    where: { guestId: userId },
+    include: guestBookingInclude,
+    orderBy: { checkIn: "desc" },
+  });
+}
+
+// Réservations reçues sur les annonces de l'hôte (balayage des demandes expirées d'abord).
+export async function listHostBookings(hostId, db = prisma) {
+  await sweepExpired({ listing: { hostId } }, db);
+  return db.booking.findMany({
+    where: { listing: { hostId } },
+    include: hostBookingInclude,
+    orderBy: { checkIn: "desc" },
+  });
+}

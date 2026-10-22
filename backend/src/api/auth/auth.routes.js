@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import * as authController from "./auth.controller.js";
-import { authenticateToken } from "../../middleware/auth.js";
+import { authenticateToken, requireAppHeader } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 
 // VARCHAR(254) : longueur maximale d'une adresse email (RFC 5321).
@@ -40,5 +40,9 @@ router.post("/login", validate(loginSchema), authController.login);
 router.get("/me", authenticateToken, authController.me);
 router.post("/forgot-password", validate(forgotPasswordSchema), authController.forgotPassword);
 router.post("/reset-password", validate(resetPasswordSchema), authController.resetPassword);
+// Sessions : cookie httpOnly afrikabnb_rt (Path=/api/auth), sans corps.
+router.post("/refresh", requireAppHeader, authController.refresh);
+router.post("/logout", requireAppHeader, authController.logout);
+router.post("/logout-all", authenticateToken, authController.logoutAll);
 
 export default router;

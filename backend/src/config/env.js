@@ -96,9 +96,30 @@ if (isProduction) {
   } else if (rawOrigins.includes("*")) {
     errors.push("CORS_ORIGIN ne peut pas contenir \"*\" en production.");
   }
-} else if (rawOrigins.length === 0) {
-  corsOrigins = ["http://localhost:3000"];
+} else {
+  // CORS avec credentials (cookie de session) : jamais de joker, même en développement.
+  if (rawOrigins.includes("*")) {
+    warnings.push('CORS_ORIGIN : "*" ignoré (incompatible avec les cookies de session). Lister les origines.');
+    corsOrigins = rawOrigins.filter((o) => o !== "*");
+  }
+  if (corsOrigins.length === 0) corsOrigins = ["http://localhost:3000"];
 }
+
+// Sessions : jeton d'accès JWT court (gardé en mémoire par le frontend) + jeton de renouvellement
+// opaque (cookie httpOnly afrikabnb_rt, haché en base). JWT_ACCESS_TTL : secondes ou 15m, 1h…
+const jwtAccessTtl = process.env.JWT_ACCESS_TTL || "15m";
+if (!/^\d+[smh]?$/.test(jwtAccessTtl)) {
+  errors.push("JWT_ACCESS_TTL invalide : secondes ou durée courte (ex. 900, 15m, 1h).");
+}
+if (process.env.JWT_EXPIRES_IN) {
+  warnings.push("JWT_EXPIRES_IN est obsolète et ignoré : utiliser JWT_ACCESS_TTL (défaut 15m).");
+}
+const refreshTtlDays = process.env.REFRESH_TTL_DAYS ? Number(process.env.REFRESH_TTL_DAYS) : 30;
+if (!Number.isInteger(refreshTtlDays) || refreshTtlDays < 1 || refreshTtlDays > 365) {
+  errors.push("REFRESH_TTL_DAYS doit être un entier entre 1 et 365.");
+}
+// Cookie Secure : toujours en production ; COOKIE_SECURE=true le force ailleurs (HTTPS local).
+const cookieSecure = isProduction || process.env.COOKIE_SECURE === "true";
 
 const port = Number(process.env.PORT) || 4000;
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0;
@@ -182,7 +203,12 @@ export const config = Object.freeze({
   corsOrigins,
   jwt: Object.freeze({
     secret: jwtSecret,
-    expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+    // Durée du jeton d'accès (signToken).
+    expiresIn: jwtAccessTtl,
+  }),
+  session: Object.freeze({
+    refreshTtlDays,
+    cookieSecure,
   }),
   appUrl,
   publicApiUrl,

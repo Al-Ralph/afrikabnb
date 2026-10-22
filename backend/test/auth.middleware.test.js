@@ -20,12 +20,17 @@ function call(token, user) {
   return new Promise((resolve) => {
     const res = {
       statusCode: 200,
+      headers: {},
       status(c) {
         this.statusCode = c;
         return this;
       },
+      set(name, value) {
+        this.headers[name.toLowerCase()] = value;
+        return this;
+      },
       json(body) {
-        resolve({ status: this.statusCode, body });
+        resolve({ status: this.statusCode, body, headers: this.headers });
         return this;
       },
     };
@@ -43,11 +48,21 @@ test("authenticateToken : 401 sans token, 403 token invalide", async () => {
   assert.equal((await call("abc.def.ghi", baseUser)).status, 403);
 });
 
+test("authenticateToken : les 401 liés au jeton portent WWW-Authenticate invalid_token (renouvellement côté client)", async () => {
+  const expired = jwt.sign({ userId: "u1" }, SECRET, { algorithm: "HS256", expiresIn: -10 });
+  for (const r of [await call(null, baseUser), await call(expired, baseUser), await call(sign(nowSec), null)]) {
+    assert.equal(r.status, 401);
+    assert.equal(r.headers["www-authenticate"], 'Bearer error="invalid_token"');
+  }
+  assert.equal((await call("abc.def.ghi", baseUser)).headers["www-authenticate"], undefined);
+});
+
 test("authenticateToken : JWT émis avant passwordChangedAt refusé (401)", async () => {
   const changedAt = new Date((nowSec - 60) * 1000);
   const old = await call(sign(nowSec - 120), { ...baseUser, passwordChangedAt: changedAt });
   assert.equal(old.status, 401);
   assert.match(old.body.error, /reconnectez-vous/);
+  assert.equal(old.headers["www-authenticate"], 'Bearer error="invalid_token"');
   const fresh = await call(sign(nowSec - 30), { ...baseUser, passwordChangedAt: changedAt });
   assert.equal(fresh.status, 200);
   // passwordChangedAt n'est jamais exposé dans req.user (renvoyé par /api/auth/me).
