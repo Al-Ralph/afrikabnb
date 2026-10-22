@@ -5,15 +5,14 @@ import { LanguageProvider } from "../context/LanguageContext";
 import { useFavorites } from "../context/FavoritesContext";
 
 // Sans valeur de retour (resetMocks), la carte utilise son état local comme hors provider.
-jest.mock("../context/FavoritesContext", () => ({ useFavorites: jest.fn() }));
+vi.mock("../context/FavoritesContext", () => ({ useFavorites: vi.fn() }));
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
 
 const baseProps = {
@@ -109,13 +108,13 @@ describe("PropertyCard", () => {
 
   describe("with FavoritesContext", () => {
     test("reflects isFavorite from the context", () => {
-      useFavorites.mockReturnValue({ isFavorite: (id) => id === 42, toggleFavorite: jest.fn() });
+      useFavorites.mockReturnValue({ isFavorite: (id) => id === 42, toggleFavorite: vi.fn() });
       renderCard();
       expect(screen.getByRole("button", { name: "Retirer des favoris" })).toHaveAttribute("aria-pressed", "true");
     });
 
     test("clicking the heart calls toggleFavorite with the listing", () => {
-      const toggleFavorite = jest.fn();
+      const toggleFavorite = vi.fn();
       useFavorites.mockReturnValue({ isFavorite: () => false, toggleFavorite });
       renderCard();
       fireEvent.click(screen.getByRole("button", { name: "Ajouter aux favoris" }));

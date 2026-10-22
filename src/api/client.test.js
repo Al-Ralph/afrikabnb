@@ -9,7 +9,7 @@ const jsonResponse = (body, { status = 200, statusText = "OK" } = {}) => ({
 
 beforeEach(() => {
   localStorage.clear();
-  global.fetch = jest.fn();
+  global.fetch = vi.fn();
 });
 
 afterEach(() => {

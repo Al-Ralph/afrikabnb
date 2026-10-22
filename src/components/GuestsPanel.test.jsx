@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import GuestsPanel from "./GuestsPanel";
 
 const setup = (props = {}) => {
-  const onChange = jest.fn();
+  const onChange = vi.fn();
   render(<GuestsPanel adults={1} children={0} babies={0} pets={0} onChange={onChange} {...props} />);
   return onChange;
 };

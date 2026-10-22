@@ -8,22 +8,21 @@ import { useGoogleMapsScript } from "../hooks/useGoogleMapsScript";
 import { api } from "../api/client";
 import { listings as mockListings } from "../data/listings";
 
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  },
-  { virtual: true }
+  }
 );
 
-jest.mock("../api/client", () => {
-  const actual = jest.requireActual("../api/client");
-  return { ...actual, api: { getListings: jest.fn(), getListingsInBounds: jest.fn() } };
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual("../api/client");
+  return { ...actual, api: { getListings: vi.fn(), getListingsInBounds: vi.fn() } };
 });
-jest.mock("../context/ConsentContext", () => ({ useConsent: jest.fn() }));
-jest.mock("../hooks/useGoogleMapsScript", () => ({ useGoogleMapsScript: jest.fn() }));
-jest.mock("../components/Footer", () => () => <footer>Footer</footer>);
+vi.mock("../context/ConsentContext", () => ({ useConsent: vi.fn() }));
+vi.mock("../hooks/useGoogleMapsScript", () => ({ useGoogleMapsScript: vi.fn() }));
+vi.mock("../components/Footer", () => ({ default: () => <footer>Footer</footer> }));
 
 const apiListing = {
   id: "11",
@@ -47,24 +46,22 @@ const renderPage = () =>
     </LanguageProvider>
   );
 
-const ORIGINAL_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 let openCookieManager;
 
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("afrikabnb_lang", "fr");
-  openCookieManager = jest.fn();
+  openCookieManager = vi.fn();
   useConsent.mockReturnValue({ thirdPartyAllowed: false, openCookieManager });
   useGoogleMapsScript.mockReturnValue({ loaded: false, error: null, hasKey: false });
   api.getListings.mockReset().mockResolvedValue({ data: [apiListing], total: 1 });
   api.getListingsInBounds.mockReset();
-  delete process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  vi.stubEnv("VITE_GOOGLE_MAPS_API_KEY", "");
   delete window.google;
 });
 
 afterAll(() => {
-  if (ORIGINAL_KEY === undefined) delete process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-  else process.env.REACT_APP_GOOGLE_MAPS_API_KEY = ORIGINAL_KEY;
+  vi.unstubAllEnvs();
 });
 
 describe("MapPage without Google Maps", () => {
@@ -101,7 +98,7 @@ describe("MapPage with Google Maps", () => {
 
   const installGoogleMock = () => {
     markers = [];
-    removeListener = jest.fn();
+    removeListener = vi.fn();
     class FakeMap {
       constructor(el, options) {
         this.options = options;
@@ -120,10 +117,10 @@ describe("MapPage with Google Maps", () => {
     class FakeMarker {
       constructor(options) {
         this.options = options;
-        this.setMap = jest.fn();
-        this.setIcon = jest.fn();
-        this.setLabel = jest.fn();
-        this.setZIndex = jest.fn();
+        this.setMap = vi.fn();
+        this.setIcon = vi.fn();
+        this.setLabel = vi.fn();
+        this.setZIndex = vi.fn();
         this.listeners = {};
         markers.push(this);
       }
@@ -137,15 +134,17 @@ describe("MapPage with Google Maps", () => {
         Marker: FakeMarker,
         Size: function Size(w, h) { return { w, h }; },
         Point: function Point(x, y) { return { x, y }; },
-        event: { removeListener, clearInstanceListeners: jest.fn() },
+        event: { removeListener, clearInstanceListeners: vi.fn() },
         places: {},
       },
     };
   };
 
   beforeEach(() => {
-    jest.useFakeTimers();
-    process.env.REACT_APP_GOOGLE_MAPS_API_KEY = "test-key";
+    // Testing Library ne détecte que les faux timers de Jest : sans shouldAdvanceTime,
+    // waitFor attendrait indéfiniment des timers figés.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubEnv("VITE_GOOGLE_MAPS_API_KEY", "test-key");
     useConsent.mockReturnValue({ thirdPartyAllowed: true, openCookieManager });
     useGoogleMapsScript.mockReturnValue({ loaded: true, error: null, hasKey: true });
     installGoogleMock();
@@ -153,7 +152,7 @@ describe("MapPage with Google Maps", () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   test("loads listings in bounds on idle (debounced), shows price markers and cleans up on unmount", async () => {
@@ -165,7 +164,7 @@ describe("MapPage with Google Maps", () => {
     });
     expect(api.getListingsInBounds).not.toHaveBeenCalled();
     await act(async () => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
     expect(api.getListingsInBounds).toHaveBeenCalledTimes(1);
     expect(api.getListingsInBounds).toHaveBeenCalledWith(

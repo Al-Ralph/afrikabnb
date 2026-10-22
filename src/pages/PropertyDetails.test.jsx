@@ -7,26 +7,25 @@ import { api } from "../api/client";
 import { listings as mockListings } from "../data/listings";
 
 let mockId = "42";
-jest.mock(
+vi.mock(
   "react-router-dom",
-  () => {
-    const React = require("react");
+  async () => {
+    const React = await vi.importActual("react");
     return {
       Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children),
       useParams: () => ({ id: mockId }),
     };
-  },
-  { virtual: true }
+  }
 );
 
-jest.mock("../api/client", () => {
-  const actual = jest.requireActual("../api/client");
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual("../api/client");
   return {
     ...actual,
-    api: { getListing: jest.fn(), getAvailability: jest.fn(), getReviews: jest.fn(), createBooking: jest.fn() },
+    api: { getListing: vi.fn(), getAvailability: vi.fn(), getReviews: vi.fn(), createBooking: vi.fn() },
   };
 });
-jest.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
+vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
 
 const renderPage = () =>
   render(

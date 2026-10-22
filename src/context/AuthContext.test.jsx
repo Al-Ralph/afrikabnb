@@ -3,8 +3,8 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth, OPEN_AUTH_EVENT } from "./AuthContext";
 import { api } from "../api/client";
 
-jest.mock("../api/client", () => ({
-  api: { getMe: jest.fn(), login: jest.fn(), register: jest.fn() },
+vi.mock("../api/client", () => ({
+  api: { getMe: vi.fn(), login: vi.fn(), register: vi.fn() },
 }));
 
 const KEY = "afrikabnb_token";
@@ -17,7 +17,7 @@ beforeEach(() => {
 
 describe("AuthContext", () => {
   test("throws outside the provider", () => {
-    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useAuth())).toThrow(/AuthProvider/);
     spy.mockRestore();
   });

@@ -13,7 +13,7 @@ beforeEach(() => {
 
 describe("ConsentContext", () => {
   test("throws outside the provider", () => {
-    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useConsent())).toThrow(/ConsentProvider/);
     spy.mockRestore();
   });

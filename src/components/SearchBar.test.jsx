@@ -4,21 +4,21 @@ import SearchBar from "./SearchBar";
 import { LanguageProvider } from "../context/LanguageContext";
 import { SearchProvider, useSearch } from "../context/SearchContext";
 
-jest.mock("./PlacesAutocompleteInput", () => {
-  const React = require("react");
-  return function MockPlaces({ value, onChange, placeholder }) {
+vi.mock("./PlacesAutocompleteInput", async () => {
+  const React = await vi.importActual("react");
+  return { default: function MockPlaces({ value, onChange, placeholder }) {
     return React.createElement("input", {
       "aria-label": "Destination",
       placeholder,
       value,
       onChange: (e) => onChange(e.target.value),
     });
-  };
+  } };
 });
 
-jest.mock("./DatePickerPanel", () => {
-  const React = require("react");
-  return function MockDatePicker({ onCheckInChange, onCheckOutChange }) {
+vi.mock("./DatePickerPanel", async () => {
+  const React = await vi.importActual("react");
+  return { default: function MockDatePicker({ onCheckInChange, onCheckOutChange }) {
     return React.createElement(
       "div",
       { "data-testid": "date-picker" },
@@ -34,7 +34,7 @@ jest.mock("./DatePickerPanel", () => {
         "pick-dates"
       )
     );
-  };
+  } };
 });
 
 // Sonde pour lire l'etat du contexte.
