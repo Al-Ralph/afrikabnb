@@ -187,10 +187,39 @@ const Confidentialite = () => (
             visibles ni des autres utilisateurs ni du public.
           </p>
           <p>
-            Données de compte, annonces, réservations, avis et favoris : l’éditeur et son
-            hébergeur de base de données, <strong>Supabase</strong> (PostgreSQL, sous-traitant
-            au sens de l’article 28 du RGPD, connexions chiffrées). La base est actuellement
-            hébergée aux États-Unis (AWS, région us-west-2) : voir « Transferts hors UE ».
+            Données de compte, annonces, réservations, avis et favoris : l’éditeur et ses
+            prestataires techniques, qui agissent comme sous-traitants au sens de l’article 28 du
+            RGPD (accès limité à ce qui est nécessaire au service, connexions chiffrées) :
+          </p>
+          <ul>
+            <li>
+              <strong>Vercel Inc.</strong> (États-Unis) : hébergement et diffusion des pages du
+              Site via son réseau mondial de serveurs ; traite notamment l’adresse IP et les
+              journaux techniques des visites.
+            </li>
+            <li>
+              <strong>Render Services, Inc.</strong> (États-Unis) : hébergement de l’API (serveur
+              applicatif) dans sa région de Francfort (Allemagne).
+            </li>
+            <li>
+              <strong>Supabase</strong> : base de données PostgreSQL et stockage des photos des
+              annonces, dans une région de l’Union européenne pour la version mise en ligne.
+            </li>
+            <li>
+              <strong>Resend</strong> (États-Unis) : envoi des e-mails transactionnels (suivi de
+              réservation, réinitialisation du mot de passe) : adresse du destinataire et contenu
+              du message.
+            </li>
+          </ul>
+          {/* APRÈS MIGRATION vers la base UE (DEPLOY.md, étape 1) : retirer ce paragraphe sur us-west-2,
+              ainsi que la phrase correspondante de la section « Transferts hors UE ». */}
+          <p>
+            Version de démonstration actuelle : sa base de données Supabase est encore hébergée
+            aux États-Unis (AWS, région us-west-2). La version mise en ligne utilise une base
+            Supabase en région Union européenne ; les données de démonstration y sont transférées
+            lors de la mise en ligne.
+          </p>
+          <p>
             Fournisseurs tiers uniquement si vous acceptez les traceurs non essentiels (Google) ou
             via chargement d’images / API carto (Unsplash, Nominatim).
           </p>
@@ -199,10 +228,25 @@ const Confidentialite = () => (
         <section className="legal-section">
           <h2>4. Transferts hors UE</h2>
           <p>
-            La base de données (Supabase) est hébergée aux États-Unis : ce transfert repose sur
-            les garanties contractuelles du sous-traitant (clauses contractuelles types / Data
-            Privacy Framework, à confirmer dans son accord de traitement des données). Google
-            Fonts, Google Maps et Unsplash peuvent aussi impliquer des traitements hors Union
+            Les données de la version mise en ligne sont stockées dans l’Union européenne (base
+            Supabase en région UE, API hébergée à Francfort). Certains prestataires sont toutefois
+            des sociétés établies aux États-Unis (Vercel, Render, Resend) ou diffusent le Site
+            depuis des serveurs situés hors de l’Union (réseau mondial de Vercel) : un accès ou un
+            traitement hors UE ne peut donc pas être exclu (assistance technique, journaux,
+            envoi des e-mails). Ces transferts éventuels reposent sur les garanties prévues par
+            les accords de traitement des données de ces prestataires (clauses contractuelles
+            types de la Commission européenne et, le cas échéant, Data Privacy Framework UE–États-Unis),
+            dont l’éditeur vérifie l’applicabilité.
+          </p>
+          {/* APRÈS MIGRATION : retirer ce paragraphe (base de démonstration us-west-2). */}
+          <p>
+            La base de la version de démonstration actuelle (Supabase, région us-west-2) est
+            hébergée aux États-Unis : ce transfert repose sur les mêmes garanties contractuelles
+            (clauses contractuelles types / Data Privacy Framework, à confirmer dans l’accord de
+            traitement des données de Supabase).
+          </p>
+          <p>
+            Google Fonts, Google Maps et Unsplash peuvent aussi impliquer des traitements hors Union
             européenne. Ces chargements non essentiels (Fonts / Maps) sont conditionnés au
             consentement via le bandeau cookies.
           </p>
