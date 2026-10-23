@@ -48,10 +48,10 @@ const Cookies = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td>afrikabnb_token</td>
-                    <td>Stockage local (JWT)</td>
-                    <td>Session authentifiée</td>
-                    <td>1 jour par défaut (expiration JWT)</td>
+                    <td>afrikabnb_rt</td>
+                    <td>Cookie HTTP <em>httpOnly</em>, <em>Secure</em>, <em>SameSite=Strict</em>, limité à /api/auth</td>
+                    <td>Maintien de la session : renouvelle la connexion sans ressaisir le mot de passe (jeton aléatoire, renouvelé à chaque usage, illisible par les scripts de la page)</td>
+                    <td>30 jours (supprimé à la déconnexion)</td>
                     <td>Exempt (strictement nécessaire au compte)</td>
                   </tr>
                   <tr>
@@ -60,6 +60,20 @@ const Cookies = () => {
                     <td>Mémoriser la langue d’interface</td>
                     <td>Jusqu’à suppression</td>
                     <td>Exempt (préférence utilisateur)</td>
+                  </tr>
+                  <tr>
+                    <td>afrikabnb_currency</td>
+                    <td>Stockage local</td>
+                    <td>Mémoriser la devise d’affichage choisie (absent en mode automatique)</td>
+                    <td>Jusqu’à suppression ou retour au mode automatique</td>
+                    <td>Exempt (préférence utilisateur)</td>
+                  </tr>
+                  <tr>
+                    <td>afrikabnb_rates</td>
+                    <td>Stockage de session</td>
+                    <td>Garder les taux de change publics pour éviter de les recharger (aucune donnée personnelle)</td>
+                    <td>6 heures, effacé à la fermeture de l’onglet</td>
+                    <td>Exempt (fonctionnement du service)</td>
                   </tr>
                   <tr>
                     <td>afrikabnb_consent</td>
@@ -85,6 +99,15 @@ const Cookies = () => {
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section className="legal-section">
+            <p>
+              Le jeton d’accès (valable 15 minutes) n’est conservé qu’en mémoire pendant la visite :
+              il n’est plus enregistré dans le stockage local du navigateur (l’ancienne entrée
+              afrikabnb_token est supprimée automatiquement). Le bouton « Se déconnecter de tous les
+              appareils » du profil ferme toutes les sessions ouvertes.
+            </p>
           </section>
 
           <section className="legal-section">

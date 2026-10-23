@@ -1,13 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
-import { formatPrice } from "../../utils/format";
+import { useCurrency } from "../../context/CurrencyContext";
 import { StarIcon } from "../Icons";
 import "./MapListingList.css";
 
 // Liste compacte synchronisée avec la carte (survol/focus = mise en avant du marqueur).
 const MapListingList = ({ listings, selectedId, onSelect, defaultCurrency }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const { formatAmount } = useCurrency();
   return (
     <ul className="map-list">
       {listings.map((listing) => {
@@ -30,7 +31,7 @@ const MapListingList = ({ listings, selectedId, onSelect, defaultCurrency }) => 
                 <span className="map-list-title">{listing.title}</span>
                 <span className="map-list-location">{listing.location}</span>
                 <span className="map-list-meta">
-                  <strong>{formatPrice(listing.price, currency, language)}</strong> / {t("common.night")}
+                  <strong>{formatAmount(listing.price, currency)}</strong> / {t("common.night")}
                   {listing.rating != null && (
                     <span className="map-list-rating">
                       <StarIcon size={12} />

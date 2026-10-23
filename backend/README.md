@@ -14,8 +14,10 @@ Copier `.env.example` vers `.env` et remplacer toutes les valeurs. La config est
 | `DATABASE_URL` | URL PostgreSQL utilisée par l’API. Supabase : **Transaction pooler** (port `6543`) avec `?pgbouncer=true&connection_limit=1&sslmode=require` | **obligatoire**, `postgresql://…` |
 | `DIRECT_URL` | URL utilisée par `prisma migrate`. Supabase : **Session pooler** ou **Direct connection** (port `5432`) avec `?sslmode=require`. Base locale : même valeur que `DATABASE_URL` | **obligatoire en production** (avertissement en dev) |
 | `JWT_SECRET` | Secret HS256 des tokens | **obligatoire en production**, ≥ 32 caractères, sans `change-me`. Générer : `openssl rand -base64 48`. En dev, un secret aléatoire temporaire est utilisé (avertissement au démarrage). |
-| `JWT_EXPIRES_IN` | Validité des tokens | `1d` |
-| `CORS_ORIGIN` | Origines autorisées, séparées par des virgules | **obligatoire en production**, `*` interdit ; dev : `http://localhost:3000` |
+| `JWT_ACCESS_TTL` | Durée du **jeton d’accès** JWT (secondes ou `15m`, `1h`…) | `15m` (`JWT_EXPIRES_IN` est obsolète et ignoré, avertissement au démarrage) |
+| `REFRESH_TTL_DAYS` | Durée du **jeton de renouvellement** (cookie `afrikabnb_rt`), renouvelée à chaque rotation | `30` (entier 1–365) |
+| `COOKIE_SECURE` | `true` : attribut `Secure` du cookie hors production (HTTPS local) | toujours `Secure` si `NODE_ENV=production` |
+| `CORS_ORIGIN` | Origines autorisées, séparées par des virgules (CORS avec `credentials: true`) | **obligatoire en production**, `*` interdit ; en dev `*` est ignoré (avertissement) ; dev : `http://localhost:3000` |
 | `TRUST_PROXY` | Nombre de reverse proxys devant l’API (rate limiting par IP) | `0` |
 | `LOG_LEVEL` | Niveau de logs pino (`fatal`, `error`, `warn`, `info`, `debug`, `trace`) | `debug` en développement, `info` sinon |
 | `LOG_SQL` | `1` : journalise toutes les requêtes SQL de Prisma (très verbeux) | désactivé |
@@ -46,7 +48,7 @@ En `local` (développement), les fichiers vont dans `backend/uploads/` (ignoré 
 
 ### Emails (Resend)
 
-Créer un compte [Resend](https://resend.com), vérifier un domaine d’envoi, créer une clé API → `RESEND_API_KEY`, `EMAIL_FROM="AfrikaBnB <no-reply@votre-domaine>"`, `EMAIL_DRIVER=resend`. Les emails partent **après** le commit de la transaction, sans bloquer la réponse HTTP : un échec est journalisé (`[email] échec d'envoi`), jamais renvoyé au client. Gabarits FR (texte + HTML, tout contenu utilisateur échappé) dans `src/services/email/templates.js`.
+Créer un compte [Resend](https://resend.com), vérifier un domaine d’envoi, créer une clé API → `RESEND_API_KEY`, `EMAIL_FROM="AfrikaBnB <no-reply@votre-domaine>"`, `EMAIL_DRIVER=resend`. Les notifications de réservation vont à l’adresse du compte du voyageur, ou à `contactEmail` pour une réservation sans compte (le lien de suivi `${APP_URL}/reservation/<jeton>` n’apparaît que dans le premier e-mail : seul le hash est conservé ensuite). Les emails partent **après** le commit de la transaction, sans bloquer la réponse HTTP : un échec est journalisé (`[email] échec d'envoi`), jamais renvoyé au client. Gabarits FR (texte + HTML, tout contenu utilisateur échappé) dans `src/services/email/templates.js`.
 
 ## Base de données Supabase
 
@@ -105,7 +107,7 @@ Un projet gratuit inactif peut être mis en pause par Supabase (il se relance de
 ### Sécurité (RLS, clés Supabase)
 
 - L’API accède à la base **uniquement via Prisma**, avec le rôle `postgres` et les URL de connexion. Le client `supabase-js` et la clé `anon` ne sont pas utilisés ; la clé `service_role` sert **uniquement** à écrire dans Supabase Storage (photos), côté serveur.
-- Supabase expose aussi le schéma `public` via son API REST (Data API) avec la clé `anon`. Les migrations activent donc **Row Level Security sans aucune policy** sur `User`, `Listing`, `Favorite`, `Booking`, `Review`, `ListingImage`, `BlockedPeriod` et `PasswordResetToken` : ces tables sont inaccessibles par cette API, tandis que Prisma (propriétaire des tables) n’est pas concerné. Pour la table technique `_prisma_migrations`, exécuter une fois dans le SQL Editor : `alter table "_prisma_migrations" enable row level security;` (ou désactiver la Data API dans les paramètres du projet si elle ne sert pas).
+- Supabase expose aussi le schéma `public` via son API REST (Data API) avec la clé `anon`. Les migrations activent donc **Row Level Security sans aucune policy** sur `User`, `Listing`, `Favorite`, `Booking`, `Review`, `ListingImage`, `BlockedPeriod`, `PasswordResetToken` et `RefreshToken` : ces tables sont inaccessibles par cette API, tandis que Prisma (propriétaire des tables) n’est pas concerné. Pour la table technique `_prisma_migrations`, exécuter une fois dans le SQL Editor : `alter table "_prisma_migrations" enable row level security;` (ou désactiver la Data API dans les paramètres du projet si elle ne sert pas).
 - **Ne jamais exposer `DATABASE_URL` / `DIRECT_URL` côté frontend** (aucune variable `VITE_*` ne doit les contenir : elles sont incluses dans le bundle public) : elles donnent un accès complet à la base. Le frontend ne parle qu’à l’API Express.
 - Les URL imposent `sslmode=require` : connexions chiffrées.
 
@@ -158,6 +160,9 @@ Les migrations sont versionnées dans `prisma/migrations/` (`migration_lock.toml
 | `20261022120000_unaccent` | extension PostgreSQL `unaccent` (recherche insensible aux accents) |
 | `20261022180000_vague3` | enums `ListingStatus`, `Amenity` ; `BookingStatus` + `DECLINED`, `EXPIRED` (`ALTER TYPE … ADD VALUE`, compatible avec une base non vide) ; `User.passwordChangedAt` ; `Listing.amenities` (défaut `{}`), `instantBook` (défaut `true`), `status` (défaut `ACTIVE`) ; tables `ListingImage`, `BlockedPeriod`, `PasswordResetToken` (cascade, index, RLS activée) ; **reprise** de chaque `Listing.imageUrl` existant en `ListingImage` position 0 |
 
+| `20261022200000_refresh_tokens` | table `RefreshToken` (`tokenHash` SHA-256 unique, `familyId`, `expiresAt`, `revokedAt`, `replacedById`, `userAgent` ; index `userId` et `familyId` ; cascade à la suppression de l’utilisateur ; RLS activée). Aucune ligne existante modifiée |
+| `20261022220000_guest_checkout` | réservation sans compte : `Booking.guestId` devient nullable (`DROP NOT NULL`, clé étrangère et cascade inchangées) ; colonnes nullable `contactName` (100), `contactEmail` (254), `contactPhone` (32), `contactCountry` (2), `arrivalTime` (5), `messageToHost` (1000), `guestAccessTokenHash` (`CHAR(64)`, unique), `guestAccessExpiresAt` ; index `contactEmail`. **Reprise** : `contactName` / `contactEmail` (minuscules) remplis depuis `User` pour les réservations existantes. Additive, sans perte |
+
 Application de la migration vague 3 (à faire une fois, avec `DIRECT_URL`) :
 
 ```bash
@@ -175,6 +180,19 @@ Les lignes existantes ne sont pas modifiées (hors ajout des colonnes avec leurs
 - Recherche texte (`where` / `q`) : insensible à la casse **et aux accents** (« Lome » trouve « Lomé ») via `unaccent(lower(...)) LIKE` dans une requête paramétrée (`findListingIdsByText`), les jokers `%`/`_` saisis étant échappés.
 - Verrouillage des réservations et des avis : `SELECT … FROM "Listing" WHERE "id" = … FOR UPDATE` dans une transaction interactive Prisma (compatible avec le pooler en mode transaction).
 
+## Architecture
+
+Couches : **routes → contrôleurs → services → Prisma**.
+
+| Couche | Emplacement | Rôle |
+|---|---|---|
+| Routes | `src/api/<domaine>/*.routes.js` | Chemins, middlewares (`authenticateToken`, `requireRole`, upload…), schémas `zod` (`validate`) |
+| Contrôleurs | `src/api/<domaine>/*.controller.js` | Minces : lisent `req` (params, corps validé, `req.user`), appellent un service, sérialisent (`listings.serializers.js`, `bookings.serializers.js`), répondent ; e-mails de réservation (`bookings.notifications.js`) et journal d’audit admin après le service |
+| Services | `src/services/{listings,listingImages,blockedPeriods,bookings,reviews,favorites,admin,maps}.js` | Règles métier et accès Prisma : transactions, verrous `FOR UPDATE`, isolation `Serializable`, calculs, balayage paresseux des `PENDING` expirées. Ne connaissent ni `req` ni `res` ; arguments simples (ids, données validées, utilisateur `{ id, role }`) ; erreurs métier via `httpError(statut, message)` traduites par `errorHandler` en `{ "error": "message" }` |
+| Utilitaires | `src/utils/` | Logique pure sans base (dates, prix, statuts de réservation, statistiques hôte) |
+
+Chaque fonction de service accepte un dernier paramètre facultatif `db` (client Prisma, `prisma` par défaut) : les tests (`test/services.*.test.js`) y injectent des objets factices pour vérifier les règles (création de réservation, transitions, propriété des annonces, dernier administrateur) sans base de données. `src/services/email` et `src/services/storage` restent les adaptateurs d’envoi d’e-mails et de stockage des photos.
+
 ## Logs
 
 Logs structurés avec **pino** / **pino-http** (`src/config/logger.js`) : sortie lisible via `pino-pretty` en `NODE_ENV=development` (si la devDependency est installée), JSON sur une ligne en production.
@@ -191,41 +209,54 @@ Logs structurés avec **pino** / **pino-http** (`src/config/logger.js`) : sortie
 npm test   # node --test, sans base de données
 ```
 
-Logique pure (nuits, prix, chevauchement, moyenne des notes, filtres / tri / équipements, codes d’erreur), statuts de réservation (PENDING, expiration 48 h, transitions, chevauchement avec les périodes bloquées), signatures d’images (magic bytes), jetons de réinitialisation (hash, expiration, usage unique, comparaison à temps constant), révocation des JWT par `passwordChangedAt` (middleware `authenticateToken`), gabarits d’emails (échappement HTML), `requireRole`, occupation et statistiques hôte.
+Sessions : jetons de renouvellement (hash, rotation, détection de réutilisation et rotations concurrentes sur un dépôt en mémoire, révocation par changement de mot de passe), options et en-tête `Set-Cookie` réel du cookie, analyse de l’en-tête `Cookie`, exigence de `X-Requested-With`, `/refresh`, `/logout`, `/logout-all`, configuration (`Secure` selon l’environnement, durées, pas de `*` en CORS). Logique pure (nuits, prix, chevauchement, moyenne des notes, filtres / tri / équipements, codes d’erreur), statuts de réservation (PENDING, expiration 48 h, transitions, chevauchement avec les périodes bloquées), signatures d’images (magic bytes), jetons de réinitialisation (hash, expiration, usage unique, comparaison à temps constant), réservation sans compte (`test/guestCheckout.test.js` : toujours `PENDING`, quota par e-mail, champ piège, `acceptTerms`, validation du contact, jeton haché, suivi / annulation par jeton, sérialisation hôte avec contact vs publique sans contact, e-mails, masquage des logs), révocation des JWT par `passwordChangedAt` (middleware `authenticateToken`), gabarits d’emails (échappement HTML), `requireRole`, occupation et statistiques hôte.
 
 ## Sécurité
 
 - `helmet`, `x-powered-by` désactivé, corps JSON limité à 100 ko.
 - Rate limiting : 300 req / 15 min sur `/api`, 10 req / 15 min (compteur partagé) sur `/api/auth/login` + `/api/auth/register`, 30 req / min sur `/api/maps/geocode` + `/api/maps/reverse` (proxy Nominatim ; `listings-in-bounds` n’interroge que la base et reste soumis à la limite générale). Réponse `429`.
-- Rate limiting supplémentaire : 5 req / 15 min sur `/api/auth/forgot-password`, 10 req / 15 min sur `/api/auth/reset-password`, 30 téléversements / 15 min sur `POST /api/listings/:id/images`.
-- Mots de passe : bcrypt 12 rounds. Tokens JWT HS256. Un JWT émis avant `User.passwordChangedAt` (renseigné par la réinitialisation du mot de passe) est refusé (`401`) : la réinitialisation révoque toutes les sessions. Le changement de mot de passe depuis le profil (`PATCH /api/users/me`) ne révoque pas encore les sessions (vague 4).
+- Rate limiting supplémentaire : 60 req / 15 min sur `/api/auth/refresh`, 5 req / 15 min sur `/api/auth/forgot-password`, 10 req / 15 min sur `/api/auth/reset-password`, 30 téléversements / 15 min sur `POST /api/listings/:id/images`, 30 req / 15 min sur `/api/guest-bookings`, 5 réservations **sans compte** créées / heure / IP sur `POST /api/listings/:id/bookings` (requêtes en échec non décomptées ; appliqué après l’authentification facultative : un faux en-tête `Authorization` ne le contourne pas).
+- Réservation sans compte : voir « Réservations » (jeton haché, champ piège, quota par e-mail). Le jeton du lien de suivi est masqué dans les logs (`/api/guest-bookings/[masqué]`).
+- Mots de passe : bcrypt 12 rounds. Sessions : voir « Sessions » ci-dessous. Un JWT émis avant `User.passwordChangedAt` est refusé (`401`) ; la réinitialisation et le changement de mot de passe révoquent aussi tous les jetons de renouvellement.
 - Téléversement : token vérifié (signature, sans base) → réception multipart en mémoire (5 Mo / fichier, 10 fichiers, champs limités) → type réel vérifié par signature binaire (JPEG, PNG, WebP ; extension et mimetype ignorés) → utilisateur en base → `sharp` (rotation EXIF, **métadonnées supprimées** dont GPS, 1600 px max, WebP qualité 80, 40 Mpx max en entrée).
 - Validation `zod` de toutes les entrées (champs inconnus refusés) : `400 { error, details: [{ path, message }] }`.
 - Erreurs : `404` JSON pour les routes inconnues, message générique pour les `5xx`, Prisma `P2002` → `409`, `P2025` → `404`, `P2034` (conflit de transaction) et échec de sérialisation / interblocage PostgreSQL (`40001`, `40P01`) → `409`.
 - Les erreurs métier ont la forme `{ "error": "message" }`.
 
+## Sessions (jeton d’accès + cookie de renouvellement)
+
+- **Jeton d’accès** : JWT HS256 de 15 min (`JWT_ACCESS_TTL`), renvoyé en JSON par `login`, `register`, `refresh` et le changement de mot de passe ; le frontend le garde **en mémoire uniquement** et l’envoie en `Authorization: Bearer`. Un `401` dû au jeton (absent, expiré, révoqué, utilisateur supprimé) porte `WWW-Authenticate: Bearer error="invalid_token"` (exposé par CORS) : c’est le signal pour appeler `/refresh` ; les autres `401` (mot de passe actuel incorrect…) ne l’ont pas.
+- **Jeton de renouvellement** : 32 octets aléatoires (base64url) dans le cookie `afrikabnb_rt` — `HttpOnly`, `SameSite=Strict`, `Path=/api/auth`, `Max-Age` = `REFRESH_TTL_DAYS` (30 j), `Secure` en production ou avec `COOKIE_SECURE=true`. Seul son SHA-256 est stocké (table `RefreshToken`). Les jetons expirés d’un utilisateur sont supprimés à chaque nouvelle session.
+- **Rotation** à chaque `/refresh` : l’ancien jeton est révoqué (`replacedById` → successeur, révocation conditionnelle atomique), un nouveau est émis dans la même famille (nouvelle échéance de 30 j). **Réutilisation** d’un jeton déjà révoqué → toute la famille est révoquée, `401`, journal `warn`. Jeton créé avant `passwordChangedAt` → refusé, sessions de l’utilisateur révoquées.
+- **CSRF** : `SameSite=Strict` + en-tête `X-Requested-With: afrikabnb` exigé sur `/refresh` et `/logout` (`403` sinon) ; le cookie n’est jamais envoyé aux autres routes (`Path`), qui s’authentifient par `Authorization`.
+- **Déploiement** : `SameSite=Strict` suppose que le frontend appelle l’API **en même origine** : en production, le frontend (Vercel) réécrit `/api/*` vers l’API (ne pas définir `VITE_API_URL`). Avec une API sur un autre site, le cookie ne serait pas envoyé. `CORS_ORIGIN` liste les origines exactes (CORS avec `credentials: true`, `*` impossible). Derrière un proxy, régler `TRUST_PROXY`. Les anciens JWT de 1 jour restent valables jusqu’à expiration mais ne peuvent pas être renouvelés : chaque utilisateur se reconnecte une fois.
+- **Plusieurs onglets** : le frontend sérialise les appels `/refresh` entre onglets (Web Locks) pour ne jamais présenter deux fois le même cookie, ce qui serait vu comme une réutilisation.
+
 ## Endpoints (segmentés par domaine)
 
-Conventions : dates de séjour au format `YYYY-MM-DD` (jours calendaires, nuits `[checkIn, checkOut[` : le jour du départ est libre pour une nouvelle arrivée) ; « aujourd’hui » = date UTC du serveur ; montants en nombres (devise de l’annonce, `XOF` par défaut). Routes « auth » : header `Authorization: Bearer <token>`, sinon `401` (token absent/expiré) ou `403` (token invalide).
+Conventions : dates de séjour au format `YYYY-MM-DD` (jours calendaires, nuits `[checkIn, checkOut[` : le jour du départ est libre pour une nouvelle arrivée) ; « aujourd’hui » = date UTC du serveur ; montants en nombres (devise de l’annonce, `XOF` par défaut). Routes « auth » : header `Authorization: Bearer <jeton d’accès>`, sinon `401` (token absent/expiré/révoqué, avec `WWW-Authenticate: Bearer error="invalid_token"`) ou `403` (token invalide).
 
 ### Santé
 - `GET /health` – état de l’API
 
 ### Auth (`/api/auth`)
-- `POST /api/auth/register` – inscription (rôle `GUEST`)
+- `POST /api/auth/register` – inscription (rôle `GUEST`) → `201 { "user", "token" }` + cookie `afrikabnb_rt`
   Body: `{ "email", "password" (8–72 caractères), "name?" }`
 - `POST /api/auth/login` – connexion
   Body: `{ "email", "password" }`
-  Réponse: `{ "user": { id, email, name, avatar, role }, "token" }`
+  Réponse: `{ "user": { id, email, name, avatar, role }, "token" }` (jeton d’accès) + `Set-Cookie: afrikabnb_rt=…` (nouvelle famille)
+- `POST /api/auth/refresh` – sans corps ; cookie `afrikabnb_rt` + en-tête `X-Requested-With: afrikabnb` (sinon `403`) → `200 { "token", "user" }` + nouveau cookie (rotation). `401` (cookie effacé) si absent, inconnu, expiré, révoqué (réutilisation : famille révoquée) ou antérieur au dernier changement de mot de passe. `429` au-delà de 60 / 15 min.
+- `POST /api/auth/logout` – sans corps ; `X-Requested-With: afrikabnb` (sinon `403`) → **toujours** `204` : révoque le jeton du cookie s’il existe, efface le cookie.
+- `POST /api/auth/logout-all` – (auth) → `204` : révoque tous les jetons de renouvellement de l’utilisateur, efface le cookie. Les jetons d’accès déjà émis restent valables jusqu’à leur expiration (15 min max).
 - `GET /api/auth/me` – utilisateur courant (auth)
 - `POST /api/auth/forgot-password` – Body `{ "email" }` → **toujours** `200 { "message": "Si un compte existe pour cet email, un lien de réinitialisation vient d'être envoyé." }` (réponse envoyée avant tout accès à la base : ni contenu ni délai ne révèlent l’existence du compte). Crée un jeton aléatoire de 32 octets (seul son SHA-256 est stocké), valable 1 h, invalide les jetons précédents, envoie le lien `${APP_URL}/reinitialiser-mot-de-passe?token=…`. `429` au-delà de 5 demandes / 15 min.
-- `POST /api/auth/reset-password` – Body `{ "token" (43 caractères base64url), "newPassword" (8–72) }` → `200 { "message" }`. Jeton inconnu, expiré ou déjà utilisé → `400 { "error": "Lien de réinitialisation invalide ou expiré" }`. Met à jour le mot de passe (bcrypt 12), renseigne `passwordChangedAt` (anciennes sessions révoquées), consomme le jeton et invalide les autres.
+- `POST /api/auth/reset-password` – Body `{ "token" (43 caractères base64url), "newPassword" (8–72) }` → `200 { "message" }`. Jeton inconnu, expiré ou déjà utilisé → `400 { "error": "Lien de réinitialisation invalide ou expiré" }`. Met à jour le mot de passe (bcrypt 12), renseigne `passwordChangedAt`, révoque tous les jetons de renouvellement (sessions fermées sur tous les appareils), consomme le jeton et invalide les autres. Aucune session n’est ouverte : l’utilisateur se reconnecte.
 
 ### Users (`/api/users`) – authentification requise
 - `GET /api/users/me` – profil `{ id, email, name, avatar, role, createdAt }`
 - `PATCH /api/users/me` – mise à jour, réponse `{ id, email, name, avatar, role }`
   Body: `{ "name?", "avatar?" (URL https), "currentPassword?", "newPassword?" (8–72) }`
-  Changer de mot de passe exige `currentPassword` (sinon `400`, incorrect → `401`).
+  Changer de mot de passe exige `currentPassword` (sinon `400`, incorrect → `401` sans `WWW-Authenticate`). En cas de changement : `passwordChangedAt` renseigné, **tous** les jetons de renouvellement révoqués, puis nouvelle session pour l’appareil courant : réponse `{ …user, "token" }` + nouveau cookie `afrikabnb_rt`.
 - `GET /api/users/me/favorites` – annonces favorites complètes : `{ "data": [Listing (isFavorite: true)] }`
 - `GET /api/users/me/bookings` – mes réservations (voyageur) : `{ "data": [Booking] }` avec `listing` complète, `hasReview`, `canReview`
 
@@ -264,7 +295,7 @@ Objet **Listing** renvoyé :
   Exemple : `/api/listings?where=lome&categoryId=bord-mer&pets=1&guests=2&checkIn=2026-11-01&checkOut=2026-11-04`
 - `GET /api/listings/:id` – détail (`404` si absente)
 - `GET /api/listings/mine` – (auth) mes annonces : `{ data: [Listing + "upcomingBookings"] }` (réservations non annulées en cours ou à venir)
-- `GET /api/listings/mine/bookings` – (auth) réservations reçues sur mes annonces : `{ data: [Booking] }` avec `guest { id, name, avatar }` et `listing { id, title, location, imageUrl, currency, instantBook }`
+- `GET /api/listings/mine/bookings` – (auth) réservations reçues sur mes annonces : `{ data: [Booking] }` avec `guest { id, name, avatar }` (`null` sans compte), `listing { id, title, location, imageUrl, currency, instantBook }`, `guestAccount` et la fiche `contact` du voyageur
 - `GET /api/listings/mine/stats` – (auth) tableau de bord hôte :
   ```json
   {
@@ -313,19 +344,33 @@ Objet **Booking** :
 }
 ```
 
+`guestId` vaut `null` pour une réservation **sans compte**. La **fiche de contact** — `"guestAccount": true|false, "contact": { name, email, phone, country, arrivalTime, message }` (`contact: null` pour une réservation antérieure sans fiche) — n’est renvoyée **qu’à l’hôte de l’annonce** (`/api/listings/mine/bookings`, `upcomingArrivals` de `/mine/stats`) et au voyageur lui-même (création, `/api/users/me/bookings`, réponses de `cancel` / `confirm` / `decline`, dont l’auteur est forcément l’hôte ou le voyageur). Toute autre sérialisation (dont `/api/guest-bookings/:token`) l’omet ; l’empreinte du jeton d’accès n’est jamais exposée.
+
 `canReview` = réservation `CONFIRMED`, date de départ atteinte et pas encore d’avis. `expiresAt` : fin du délai de réponse de l’hôte (`PENDING` uniquement, sinon `null`).
 
 Statuts : `CONFIRMED` (réservation instantanée ou acceptée), `PENDING` (demande en attente : annonce `instantBook: false`), `DECLINED` (refusée par l’hôte), `EXPIRED` (sans réponse), `CANCELLED`. `PENDING` et `CONFIRMED` bloquent les dates ; `CANCELLED`, `DECLINED`, `EXPIRED` les libèrent.
 
 **Expiration (choix : statut calculé + persistance paresseuse)** : une demande `PENDING` est expirée 48 h après sa création, ou dès que son jour d’arrivée est passé. Le statut renvoyé par l’API et les filtres de disponibilité appliquent cette règle à la lecture (`src/utils/bookingStatus.js`) : le résultat est exact sans tâche planifiée. La valeur `EXPIRED` est ensuite écrite en base quand la demande est touchée (accepter / refuser / annuler → `409` « Cette demande a expiré ») et par un `updateMany` lors de la lecture des listes de réservations (voyageur ou hôte). Pas de cron à exploiter ; la base peut contenir des `PENDING` périmées entre deux lectures, sans effet sur l’API.
 
-- `POST /api/listings/:id/bookings` – (auth) réserver → `201 Booking`
-  Body : `{ "checkIn": "2026-11-01", "checkOut": "2026-11-04", "guests": 2 }`
+- `POST /api/listings/:id/bookings` – (authentification **facultative**) réserver → `201 Booking` (avec `contact`)
+  Body :
+  ```json
+  {
+    "checkIn": "2026-11-01", "checkOut": "2026-11-04", "guests": 2,
+    "contact": { "name": "Ama Mensah", "email": "ama@example.com", "phone": "+228 90 00 00 00", "country": "TG", "arrivalTime": "15:30", "message": "Arrivée en taxi" },
+    "acceptTerms": true,
+    "website": ""
+  }
+  ```
+  `contact` obligatoire (connecté ou non ; le frontend le pré-remplit pour un membre) : `name` 2–100 caractères sans caractère de contrôle, `email` (≤ 254, normalisé en minuscules), `phone` (≤ 32 : chiffres, espaces, `+` initial, `.-()`, 6 à 15 chiffres), `country` (ISO 3166-1 alpha-2), `arrivalTime?` (`HH:MM`), `message?` (≤ 1000). `acceptTerms: true` obligatoire (CGU + transmission des coordonnées à l’hôte). `website` : **champ piège** anti-robot, vide ou absent, sinon `400 { "error": "Requête invalide" }` (générique, sans détail, avant toute validation ou accès à la base).
+  **Sans compte** : toujours `PENDING` (l’hôte valide, même si `instantBook`), 60 nuits max, 3 demandes `PENDING` actives max **par adresse e-mail** (`429` ; verrou consultatif `pg_advisory_xact_lock(hashtext(email))` contre les envois simultanés), 5 réservations / heure / IP. Un jeton aléatoire de 32 octets (base64url) est créé ; seul son SHA-256 est stocké (`guestAccessTokenHash`), valable jusqu’au départ + 30 jours. La réponse contient alors `"manageUrl": "${APP_URL}/reservation/<jeton>"` (`Cache-Control: no-store`). **Choix** : le lien part aussi par e-mail ; l’afficher sur l’écran de confirmation du navigateur qui vient de réserver ne donne à ce navigateur que l’accès à la demande qu’il vient lui-même de créer. La possession de l’adresse e-mail n’est donc pas prouvée : la réservation reste une demande que l’hôte valide. Une réservation sans compte n’est jamais rattachée à un compte existant ayant la même adresse.
   Contrôles : dates `YYYY-MM-DD` valides, `checkOut > checkIn`, `checkIn ≥ aujourd’hui`, ≤ 365 nuits, `guests` 1–50 (`400`) ; `guests ≤ maxGuests` (`400`) ; pas sa propre annonce (`403`) ; annonce inexistante ou masquée (`404`) ; chevauchement avec une réservation bloquante ou une période bloquée → `409 { "error": "Ces dates ne sont pas disponibles" }`.
-  Annonce `instantBook: true` → `status: "CONFIRMED"` (emails : voyageur + hôte) ; `false` → `status: "PENDING"` (email : demande à l’hôte).
+  Connecté : annonce `instantBook: true` → `status: "CONFIRMED"` (e-mails : voyageur + hôte) ; `false` → `status: "PENDING"` (e-mails : récapitulatif au voyageur, demande à l’hôte). L’e-mail à l’hôte contient la **fiche de contact** (marquée « saisie par le voyageur », et « sans compte, non vérifiée » le cas échéant).
   `totalPrice = nuits × pricePerNight`. Le contrôle et l’insertion sont faits dans une transaction qui verrouille la ligne de l’annonce (`SELECT … FOR UPDATE`) : pas de double réservation concurrente.
 - `GET /api/listings/:id/availability?from=YYYY-MM-DD&to=YYYY-MM-DD` – nuits indisponibles (sans info personnelle). Défaut : `from` = aujourd’hui, `to` = `from` + 365 j (période ≤ 730 j). `404` si l’annonce est masquée.
   Réponse : `{ "listingId", "from", "to", "booked": [{ "checkIn", "checkOut" }], "blocked": [{ "startDate", "endDate" }] }` — `booked` contient les réservations bloquantes **et** les périodes bloquées (un calendrier qui ne lit que `booked` reste correct) ; `blocked` : périodes bloquées seules, sans la raison.
+- `GET /api/guest-bookings/:token` – (sans compte, jeton du lien de suivi) → `Booking` avec `listing` publique (hôte `{ id, name, avatar }`, jamais son e-mail), **sans** fiche de contact. Jeton mal formé, inconnu ou expiré → `404 { "error": "Réservation introuvable" }`. Réponses avec `Referrer-Policy: no-referrer` et `Cache-Control: no-store` ; 30 req / 15 min.
+- `POST /api/guest-bookings/:token/cancel` – annulation par le voyageur sans compte, **mêmes règles** que `PATCH /api/bookings/:id/cancel` (`409` si séjour commencé, demande expirée ou refusée ; idempotent) → `Booking`. E-mails : voyageur (adresse de la fiche) + hôte.
 - `PATCH /api/bookings/:id/cancel` – (auth, voyageur ou hôte de l’annonce, sinon `403`) → `Booking` avec `status: "CANCELLED"` (`CONFIRMED` ou `PENDING`). Idempotent ; `409` si le séjour a déjà commencé (`checkIn ≤ aujourd’hui`), si la demande a expiré ou a été refusée. Emails : voyageur + hôte.
 - `PATCH /api/bookings/:id/confirm` – (auth, hôte de l’annonce, sinon `403`) demande `PENDING` → `CONFIRMED` (email au voyageur et à l’hôte). `409` si expirée (persistée `EXPIRED`), déjà traitée ou dates devenues indisponibles.
 - `PATCH /api/bookings/:id/decline` – (auth, hôte) `PENDING` → `DECLINED` (email au voyageur). Mêmes `409`.

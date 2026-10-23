@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { AMENITIES } from "../../api/client";
+import { useCurrency } from "../../context/CurrencyContext";
 import { formatPrice } from "../../utils/format";
 import AmenityIcon from "../AmenityIcon";
 import Modal from "../Modal";
@@ -24,8 +25,12 @@ const parseField = (str) => {
 
 // Panneau « Filtres » : fourchette de prix (curseurs + champs) et équipements.
 // Monté à l'ouverture : le brouillon part des filtres appliqués, rien n'est appliqué avant « Afficher ».
+// Les bornes restent dans la devise des annonces (XOF, celle de l'API) ; quand l'affichage est
+// converti, l'équivalent indicatif de la fourchette est ajouté entre parenthèses.
 const FiltersPanel = ({ applied, priceRange, currency = "XOF", onApply, onClose }) => {
   const { t, language } = useLanguage();
+  const { formatAmount, isConverted } = useCurrency();
+  const converted = isConverted(currency);
   const [minStr, setMinStr] = useState(toField(applied.minPrice));
   const [maxStr, setMaxStr] = useState(toField(applied.maxPrice));
   const [amenities, setAmenities] = useState(applied.amenities || []);
@@ -87,6 +92,7 @@ const FiltersPanel = ({ applied, priceRange, currency = "XOF", onApply, onClose 
         <p className="filters-hint">
           {t("filters.priceHint")}
           {hasSlider && ` · ${formatPrice(lo, currency, language)} – ${formatPrice(hi, currency, language)}`}
+          {hasSlider && converted && ` (${formatAmount(lo, currency)} – ${formatAmount(hi, currency)})`}
         </p>
         {hasSlider && (
           <div
@@ -153,6 +159,7 @@ const FiltersPanel = ({ applied, priceRange, currency = "XOF", onApply, onClose 
             />
           </label>
         </div>
+        {converted && <p className="filters-hint filters-unit">{t("currency.filterUnit")}</p>}
         {priceInvalid && (
           <p id="filters-price-error" className="filters-error" role="alert">
             {t("filters.priceError")}

@@ -1,17 +1,12 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
-import BookingWidget, { OPEN_AUTH_EVENT } from "./BookingWidget";
+import BookingWidget, { checkoutPath } from "./BookingWidget";
 import { LanguageProvider } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 
-vi.mock(
-  "react-router-dom",
-  async () => {
-    const React = await vi.importActual("react");
-    return { Link: ({ to, children, ...rest }) => React.createElement("a", { href: to, ...rest }, children) };
-  }
-);
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", () => ({ useNavigate: () => mockNavigate }));
 
 vi.mock("../../api/client", async () => {
   const actual = await vi.importActual("../../api/client");
@@ -51,6 +46,7 @@ beforeEach(() => {
   useAuth.mockReturnValue({ user: { id: "guest-1", name: "Kofi" } });
   api.getAvailability.mockReset().mockResolvedValue({ listingId: "7", booked: [] });
   api.createBooking.mockReset();
+  mockNavigate.mockReset();
 });
 
 describe("BookingWidget", () => {
@@ -86,46 +82,35 @@ describe("BookingWidget", () => {
     expect(dayButtons(22)).not.toBeDisabled();
   });
 
-  test("books the stay and shows a confirmation linking to the profile", async () => {
-    api.createBooking.mockResolvedValue({
-      id: "b1",
-      checkIn: `${nextYear}-06-10`,
-      checkOut: `${nextYear}-06-13`,
-      totalPrice: 135000,
-      currency: "XOF",
-      status: "CONFIRMED",
+  test("« Réserver » opens the booking step with the dates and guests (no direct booking)", async () => {
+    await renderWidget();
+    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
+    expect(mockNavigate).toHaveBeenCalledWith(`/reserver/7?checkIn=${nextYear}-06-10&checkOut=${nextYear}-06-13&guests=2`, {
+      state: { listing },
     });
-    await renderWidget();
-    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
-    expect(await screen.findByText("Réservation confirmée !")).toBeInTheDocument();
-    expect(api.createBooking).toHaveBeenCalledWith("7", {
-      checkIn: new Date(nextYear, 5, 10),
-      checkOut: new Date(nextYear, 5, 13),
-      guests: 2,
-    });
-    expect(screen.getByRole("link", { name: "Voir mes réservations" })).toHaveAttribute("href", "/profil");
-  });
-
-  test("a 409 shows 'dates unavailable' and refreshes the availability", async () => {
-    api.createBooking.mockRejectedValue(Object.assign(new Error("Conflit"), { status: 409 }));
-    await renderWidget();
-    await waitFor(() => expect(api.getAvailability).toHaveBeenCalledTimes(1));
-    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Ces dates ne sont plus disponibles");
-    await waitFor(() => expect(api.getAvailability).toHaveBeenCalledTimes(2));
-  });
-
-  test("when logged out, asks to log in and dispatches the open-auth event", async () => {
-    useAuth.mockReturnValue({ user: null });
-    const onOpenAuth = vi.fn();
-    window.addEventListener(OPEN_AUTH_EVENT, onOpenAuth);
-    await renderWidget();
-    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Connectez-vous pour réserver ce logement.");
     expect(api.createBooking).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
-    expect(onOpenAuth).toHaveBeenCalledTimes(1);
-    window.removeEventListener(OPEN_AUTH_EVENT, onOpenAuth);
+  });
+
+  test("logged-out visitors can also continue to the booking step (booking without an account)", async () => {
+    useAuth.mockReturnValue({ user: null });
+    await renderWidget();
+    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  test("without dates, asks to choose them instead of opening the booking step", async () => {
+    mockApplied = {};
+    await renderWidget();
+    fireEvent.click(widget().getByRole("button", { name: "Réserver" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Choisissez vos dates d’arrivée et de départ.");
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  test("checkoutPath encodes the listing id and the stay", () => {
+    expect(checkoutPath("a b", { checkIn: "2030-01-02", checkOut: "2030-01-05", guests: 3 })).toBe(
+      "/reserver/a%20b?checkIn=2030-01-02&checkOut=2030-01-05&guests=3"
+    );
   });
 
   test("demo listings show a notice and no booking form", async () => {
@@ -135,22 +120,12 @@ describe("BookingWidget", () => {
     expect(api.getAvailability).not.toHaveBeenCalled();
   });
 
-  test("on-request listing (instantBook=false): « Demande de réservation », PENDING result with the 48 h notice", async () => {
-    api.createBooking.mockResolvedValue({
-      id: "b2",
-      checkIn: `${nextYear}-06-10`,
-      checkOut: `${nextYear}-06-13`,
-      totalPrice: 135000,
-      currency: "XOF",
-      status: "PENDING",
-    });
+  test("on-request listing (instantBook=false): « Demande de réservation » opens the booking step", async () => {
     await renderWidget({ listing: { ...listing, instantBook: false } });
     expect(widget().getByText(/Cet hôte valide chaque demande/)).toBeInTheDocument();
     expect(widget().queryByRole("button", { name: "Réserver" })).not.toBeInTheDocument();
     fireEvent.click(widget().getByRole("button", { name: "Demande de réservation" }));
-    expect(await screen.findByText("Demande envoyée")).toBeInTheDocument();
-    expect(screen.getByText(/L'hôte a 48 h pour répondre/)).toBeInTheDocument();
-    expect(screen.queryByText("Réservation confirmée !")).not.toBeInTheDocument();
+    expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(/^\/reserver\/7\?/), expect.anything());
   });
 
   test("dates blocked by the host (returned in availability.booked) cannot be booked", async () => {

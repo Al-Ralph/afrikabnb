@@ -2,7 +2,32 @@
 // de vite.config.js redirige vers le backend ; en production, l'API est servie sur la même origine.
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-async function request(path, options = {}) {
+// Sessions : le jeton d'accès (JWT court) n'existe qu'en mémoire, jamais dans localStorage /
+// sessionStorage ; le jeton de renouvellement est un cookie httpOnly (afrikabnb_rt, Path=/api/auth)
+// illisible par le JavaScript. Migration : l'ancien JWT stocké est supprimé au chargement.
+const LEGACY_TOKEN_KEY = "afrikabnb_token";
+try {
+  globalThis.localStorage?.removeItem(LEGACY_TOKEN_KEY);
+} catch {
+  // Stockage indisponible (navigation privée stricte) : rien à purger.
+}
+
+// Émis sur window quand la session ne peut plus être renouvelée (écouté par AuthProvider).
+export const SESSION_EXPIRED_EVENT = "afrikabnb:session-expired";
+// En-tête exigé par /api/auth/refresh et /api/auth/logout (défense CSRF).
+const APP_HEADER = { "X-Requested-With": "afrikabnb" };
+
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = token || null;
+}
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+async function send(path, options, token) {
   const base = API_BASE.replace(/\/$/, "");
   const url = base ? `${base}${path}` : path;
   // FormData (téléversement) : le navigateur fixe lui-même multipart/form-data et sa frontière.
@@ -11,11 +36,17 @@ async function request(path, options = {}) {
     ...(options.body != null && !isForm ? { "Content-Type": "application/json" } : {}),
     ...options.headers,
   };
-  const token = localStorage.getItem("afrikabnb_token");
   if (token) headers.Authorization = `Bearer ${token}`;
+  const init = { ...options, headers };
+  // Routes qui lisent ou posent le cookie de session : cookie envoyé / accepté même si l'API est
+  // sur une autre origine (VITE_API_URL), avec l'en-tête applicatif.
+  if (path.startsWith("/api/auth/") || options.credentials === "include") {
+    init.credentials = "include";
+    Object.assign(headers, APP_HEADER);
+  }
   let res;
   try {
-    res = await fetch(url, { ...options, headers });
+    res = await fetch(url, init);
   } catch (cause) {
     const err = new Error("API injoignable");
     err.network = true;
@@ -23,13 +54,70 @@ async function request(path, options = {}) {
     throw err;
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || res.statusText);
-    err.status = res.status;
-    // Erreurs de validation (400) : [{ path, message }].
-    if (Array.isArray(data.details)) err.details = data.details;
-    throw err;
+  return { res, data };
+}
+
+function httpError(res, data) {
+  const err = new Error(data.error || res.statusText);
+  err.status = res.status;
+  // Erreurs de validation (400) : [{ path, message }].
+  if (Array.isArray(data.details)) err.details = data.details;
+  return err;
+}
+
+// Verrou inter-onglets (Web Locks) : deux onglets ne présentent jamais le même cookie en même
+// temps (sinon la rotation verrait une réutilisation et fermerait la session partout).
+function withRefreshLock(fn) {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  return locks?.request ? locks.request("afrikabnb-refresh", fn) : fn();
+}
+
+let refreshPromise = null;
+
+// Renouvelle la session à partir du cookie : { token, user }. Mutualisé : les appels simultanés
+// partagent la même requête. Rejette (err.status 401) si la session est absente ou révoquée.
+export function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = withRefreshLock(async () => {
+      const { res, data } = await send("/api/auth/refresh", { method: "POST" }, null);
+      if (!res.ok) {
+        accessToken = null;
+        throw httpError(res, data);
+      }
+      accessToken = data.token || null;
+      return data;
+    }).finally(() => {
+      refreshPromise = null;
+    });
   }
+  return refreshPromise;
+}
+
+function notifySessionExpired() {
+  accessToken = null;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+// options.auth === false : jamais d'en-tête Authorization (connexion, inscription…).
+async function request(path, { auth = true, ...options } = {}) {
+  const token = auth ? accessToken : null;
+  let { res, data } = await send(path, options, token);
+  // Jeton d'accès expiré ou révoqué (401 + WWW-Authenticate: Bearer error="invalid_token") : un seul
+  // renouvellement, puis un seul rejeu. Les autres 401 (mot de passe actuel incorrect…) remontent tels quels.
+  if (res.status === 401 && token && /invalid_token/.test(res.headers?.get?.("WWW-Authenticate") || "")) {
+    let fresh = accessToken && accessToken !== token ? accessToken : null;
+    if (!fresh) {
+      try {
+        fresh = (await refreshSession()).token;
+      } catch (err) {
+        // Session refusée par l'API : déconnexion. Panne réseau / serveur : on garde l'état.
+        if (err?.status === 401 || err?.status === 403) notifySessionExpired();
+        throw httpError(res, data);
+      }
+    }
+    ({ res, data } = await send(path, options, fresh));
+  }
+  if (!res.ok) throw httpError(res, data);
   return data;
 }
 
@@ -162,18 +250,32 @@ export const api = {
     return normalizeListing(await request(`/api/listings/${encodeURIComponent(id)}`));
   },
 
+  // { user, token } : le jeton d'accès est gardé en mémoire, le cookie de renouvellement est posé
+  // par l'API.
   async login(email, password) {
-    return request("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    const data = await request("/api/auth/login", { ...jsonBody("POST", { email, password }), auth: false });
+    setAccessToken(data.token);
+    return data;
   },
 
   async register(email, password, name) {
-    return request("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password, name }),
-    });
+    const data = await request("/api/auth/register", { ...jsonBody("POST", { email, password, name }), auth: false });
+    setAccessToken(data.token);
+    return data;
+  },
+
+  refreshSession,
+
+  // Déconnexion de cet appareil : jeton oublié, cookie révoqué et effacé par l'API (204).
+  async logout() {
+    setAccessToken(null);
+    await request("/api/auth/logout", { method: "POST", auth: false });
+  },
+
+  // Déconnexion de tous les appareils (toutes les sessions de l'utilisateur).
+  async logoutAll() {
+    await request("/api/auth/logout-all", { method: "POST" });
+    setAccessToken(null);
   },
 
   async getMe() {
@@ -183,12 +285,12 @@ export const api = {
   // --- Mot de passe oublié ---
   // Toujours 200 avec le même message (que le compte existe ou non). 429 si trop de demandes.
   async forgotPassword(email) {
-    return request("/api/auth/forgot-password", jsonBody("POST", { email }));
+    return request("/api/auth/forgot-password", { ...jsonBody("POST", { email }), auth: false });
   },
 
   // 400 si le jeton est invalide, expiré ou déjà utilisé.
   async resetPassword(token, newPassword) {
-    return request("/api/auth/reset-password", jsonBody("POST", { token, newPassword }));
+    return request("/api/auth/reset-password", { ...jsonBody("POST", { token, newPassword }), auth: false });
   },
 
   // { min, max } des prix des annonces publiques (null sans annonce).
@@ -215,11 +317,17 @@ export const api = {
     return results || [];
   },
 
+  // Taux d'affichage { base: "XOF", rates: { EUR, USD, … }, updatedAt, source } (public, sans jeton).
+  async getRates() {
+    return request("/api/rates", { auth: false });
+  },
+
   // --- Profil ---
   async updateProfile(data) {
-    const { token, ...user } = await request("/api/users/me", jsonBody("PATCH", data));
+    // credentials : un changement de mot de passe pose un nouveau cookie de session.
+    const { token, ...user } = await request("/api/users/me", { ...jsonBody("PATCH", data), credentials: "include" });
     // Changement de mot de passe : les autres sessions sont révoquées, le nouveau jeton garde celle-ci.
-    if (token) localStorage.setItem("afrikabnb_token", token);
+    if (token) setAccessToken(token);
     return user;
   },
 
@@ -320,10 +428,31 @@ export const api = {
     return (data || []).map(normalizeBooking);
   },
 
-  async createBooking(listingId, { checkIn, checkOut, guests }) {
-    const body = { checkIn: toIsoDay(checkIn), checkOut: toIsoDay(checkOut), guests: Number(guests) };
+  // Réservation connectée ou sans compte (même formulaire) : contact { name, email, phone, country,
+  // arrivalTime?, message? }, acceptTerms: true, website (champ piège, vide). Sans compte, la réponse
+  // contient manageUrl (lien de suivi, aussi envoyé par e-mail). 409 dates prises, 429 quota.
+  async createBooking(listingId, { checkIn, checkOut, guests, contact, acceptTerms, website = "" }) {
+    const body = {
+      checkIn: toIsoDay(checkIn),
+      checkOut: toIsoDay(checkOut),
+      guests: Number(guests),
+      contact,
+      acceptTerms,
+      website,
+    };
     return normalizeBooking(
       await request(`/api/listings/${enc(listingId)}/bookings`, jsonBody("POST", body))
+    );
+  },
+
+  // Réservation sans compte, par le jeton du lien de suivi (404 si inconnu ou expiré).
+  async getGuestBooking(token) {
+    return normalizeBooking(await request(`/api/guest-bookings/${enc(token)}`, { auth: false }));
+  },
+
+  async cancelGuestBooking(token) {
+    return normalizeBooking(
+      await request(`/api/guest-bookings/${enc(token)}/cancel`, { method: "POST", auth: false })
     );
   },
 

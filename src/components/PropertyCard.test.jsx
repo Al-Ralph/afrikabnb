@@ -1,11 +1,14 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import PropertyCard from "./PropertyCard";
 import { LanguageProvider } from "../context/LanguageContext";
 import { useFavorites } from "../context/FavoritesContext";
+import { CurrencyProvider } from "../context/CurrencyContext";
+import { api } from "../api/client";
 
 // Sans valeur de retour (resetMocks), la carte utilise son état local comme hors provider.
 vi.mock("../context/FavoritesContext", () => ({ useFavorites: vi.fn() }));
+vi.mock("../api/client", () => ({ api: { getRates: vi.fn() } }));
 
 vi.mock(
   "react-router-dom",
@@ -124,5 +127,36 @@ describe("PropertyCard", () => {
       // L'état affiché vient du contexte, pas d'un état local.
       expect(screen.getByRole("button", { name: "Ajouter aux favoris" })).toBeInTheDocument();
     });
+  });
+});
+
+describe("PropertyCard — display currency", () => {
+  const RATES = { base: "XOF", rates: { XOF: 1, EUR: 1 / 655.957 }, updatedAt: "2026-10-21T00:00:00.000Z", source: "exchangerate-api" };
+  const renderWithCurrency = (props) =>
+    render(
+      <LanguageProvider>
+        <CurrencyProvider>
+          <PropertyCard {...baseProps} {...props} />
+        </CurrencyProvider>
+      </LanguageProvider>
+    );
+
+  test("a XOF price is shown converted (≈) into the chosen currency once rates are loaded", async () => {
+    sessionStorage.clear();
+    localStorage.setItem("afrikabnb_currency", "EUR");
+    api.getRates.mockResolvedValue(RATES);
+    renderWithCurrency({ price: 32797.85, currency: "XOF" });
+    // Avant les taux : devise d'origine.
+    expect(screen.getByText(/F\sCFA/)).toBeInTheDocument();
+    expect(await screen.findByText(/^≈\s50,00\s€$/)).toBeInTheDocument();
+  });
+
+  test("without rates the original XOF price is kept", async () => {
+    sessionStorage.clear();
+    localStorage.setItem("afrikabnb_currency", "EUR");
+    api.getRates.mockRejectedValue(new Error("API injoignable"));
+    renderWithCurrency({ price: 25000, currency: "XOF" });
+    await waitFor(() => expect(api.getRates).toHaveBeenCalled());
+    expect(screen.getByText(/^25\s000\sF\sCFA$/)).toBeInTheDocument();
   });
 });

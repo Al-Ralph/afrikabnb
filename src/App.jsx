@@ -13,6 +13,8 @@ import "./App.css";
 const Host = lazy(() => import("./pages/Host"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const GuestBooking = lazy(() => import("./pages/GuestBooking"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
@@ -34,6 +36,9 @@ const App = () => {
               <Route path="/profil" element={<Profile />} />
               <Route path="/carte" element={<MapPage />} />
               <Route path="/reinitialiser-mot-de-passe" element={<ResetPassword />} />
+              <Route path="/reserver/:id" element={<Checkout />} />
+              <Route path="/reservation/:token" element={<GuestBooking />} />
+              <Route path="/reservation" element={<GuestBooking />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/mentions-legales" element={<MentionsLegales />} />
               <Route path="/confidentialite" element={<Confidentialite />} />

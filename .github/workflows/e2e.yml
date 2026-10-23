@@ -1,0 +1,137 @@
+name: Tests de bout en bout
+
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (Chromium, PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: afrikabnb_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d afrikabnb_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Base jetable du job : la suite complète y écrit (comptes, réservations, annonces).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/afrikabnb_e2e?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/afrikabnb_e2e?schema=public
+      PORT: 4000
+      CORS_ORIGIN: http://localhost:3000
+      APP_URL: http://localhost:3000
+      PUBLIC_API_URL: http://localhost:4000
+      EMAIL_DRIVER: console
+      STORAGE_DRIVER: local
+      LOG_LEVEL: info
+      # X-Forwarded-For de confiance : chaque test Playwright présente sa propre adresse fictive
+      # (e2e/fixtures.js), les limites de débit de l'API ne se cumulent pas sur toute la suite.
+      TRUST_PROXY: 1
+      # Sortie du backend (logs JSON, e-mails de EMAIL_DRIVER=console) lue par les tests.
+      E2E_BACKEND_LOG: ${{ github.workspace }}/e2e-logs/backend.log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Générer les secrets de test
+        run: |
+          jwt=$(openssl rand -base64 48 | tr -d '\n')
+          admin=$(openssl rand -base64 24 | tr -d '\n')
+          echo "::add-mask::$jwt"
+          echo "::add-mask::$admin"
+          echo "JWT_SECRET=$jwt" >> "$GITHUB_ENV"
+          echo "SEED_ADMIN_PASSWORD=$admin" >> "$GITHUB_ENV"
+
+      - name: Dépendances du frontend
+        run: npm ci
+      - name: Dépendances du backend
+        working-directory: backend
+        run: npm ci
+
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache des navigateurs Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Installer Chromium et ses dépendances système
+        run: npx playwright install --with-deps chromium
+
+      - name: Base de données (migrations et seed)
+        working-directory: backend
+        env:
+          NODE_ENV: test
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run db:seed
+
+      - name: Démarrer l'API en arrière-plan
+        working-directory: backend
+        env:
+          NODE_ENV: test
+        run: |
+          mkdir -p "$(dirname "$E2E_BACKEND_LOG")"
+          nohup node src/index.js > "$E2E_BACKEND_LOG" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:4000/health && exit 0
+            sleep 1
+          done
+          echo "L'API n'a pas démarré :"; cat "$E2E_BACKEND_LOG"; exit 1
+
+      - name: Démarrer le frontend (Vite) en arrière-plan
+        run: |
+          nohup npm run dev -- --strictPort > e2e-logs/frontend.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/ && curl -fsS http://localhost:3000/health; then
+              # Préchauffage : premières transformations Vite avant le premier test.
+              curl -fsS -o /dev/null http://localhost:3000/src/index.jsx || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Le frontend n'a pas démarré :"; cat e2e-logs/frontend.log; exit 1
+
+      - name: Tests Playwright
+        run: npx playwright test
+
+      - name: Rapport Playwright, traces et logs (en cas d'échec)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            e2e-logs/
+          retention-days: 7
+          if-no-files-found: ignore

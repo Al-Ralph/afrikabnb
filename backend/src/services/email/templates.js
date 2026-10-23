@@ -61,6 +61,33 @@ function stayLine({ listingTitle, checkIn, checkOut, nights, guests }) {
   return `« ${listingTitle} » du ${formatDayFr(checkIn)} au ${formatDayFr(checkOut)}${n}${g}.`;
 }
 
+// Nom du pays en français à partir du code ISO 3166-1 alpha-2 (repli : le code).
+export function countryNameFr(code) {
+  if (!code) return "";
+  try {
+    return new Intl.DisplayNames(["fr"], { type: "region" }).of(String(code).toUpperCase()) || String(code);
+  } catch {
+    return String(code);
+  }
+}
+
+// Fiche de contact transmise à l'hôte : un paragraphe par champ (échappés dans la version HTML).
+function contactParagraphs(contact, guestAccount) {
+  if (!contact) return [];
+  const lines = [
+    guestAccount === false
+      ? "Coordonnées saisies par le voyageur (réservation sans compte AfrikaBnB, non vérifiées) :"
+      : "Coordonnées saisies par le voyageur :",
+    `Nom : ${oneLine(contact.name)}`,
+    `E-mail : ${oneLine(contact.email)}`,
+  ];
+  if (contact.phone) lines.push(`Téléphone : ${oneLine(contact.phone)}`);
+  if (contact.country) lines.push(`Pays : ${countryNameFr(contact.country)}`);
+  if (contact.arrivalTime) lines.push(`Heure d'arrivée estimée : ${oneLine(contact.arrivalTime)}`);
+  if (contact.message) lines.push(`Message du voyageur : ${contact.message}`);
+  return lines;
+}
+
 export function passwordResetEmail({ name, resetUrl }) {
   return layout({
     subject: "Réinitialisation de votre mot de passe AfrikaBnB",
@@ -82,35 +109,61 @@ export function bookingConfirmedGuestEmail({ name, booking, url }) {
     paragraphs: [
       `Votre réservation est confirmée : ${stayLine(booking)}`,
       `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}.`,
+      "Vos coordonnées ont été transmises à l'hôte pour organiser votre séjour.",
     ],
     action: url ? { label: "Voir mes voyages", url } : undefined,
   });
 }
 
-// Réservation confirmée (instantanée) : hôte.
-export function bookingConfirmedHostEmail({ name, guestName, booking, url }) {
+// Réservation confirmée (instantanée ou acceptée) : hôte, avec la fiche de contact du voyageur.
+export function bookingConfirmedHostEmail({ name, guestName, booking, url, contact, guestAccount }) {
   return layout({
     subject: `Nouvelle réservation : ${booking.listingTitle}`,
     name,
     paragraphs: [
       `${guestName || "Un voyageur"} a réservé ${stayLine(booking)}`,
       `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}.`,
+      ...contactParagraphs(contact, guestAccount),
     ],
     action: url ? { label: "Voir mes réservations", url } : undefined,
   });
 }
 
-// Demande de réservation en attente : hôte.
-export function bookingRequestHostEmail({ name, guestName, booking, url }) {
+// Demande de réservation en attente : hôte, avec la fiche de contact du voyageur.
+export function bookingRequestHostEmail({ name, guestName, booking, url, contact, guestAccount }) {
   return layout({
     subject: `Demande de réservation : ${booking.listingTitle}`,
     name,
     paragraphs: [
       `${guestName || "Un voyageur"} souhaite réserver ${stayLine(booking)}`,
       `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}.`,
+      ...contactParagraphs(contact, guestAccount),
       "Acceptez ou refusez la demande sous 48 heures, sans quoi elle expirera automatiquement.",
     ],
     action: url ? { label: "Répondre à la demande", url } : undefined,
+  });
+}
+
+// Demande de réservation envoyée : récapitulatif au voyageur. `manageUrl` : lien de suivi d'une
+// réservation sans compte (sinon `url` : espace voyageur).
+export function bookingRequestGuestEmail({ name, booking, url, manageUrl }) {
+  return layout({
+    subject: `Demande envoyée : ${booking.listingTitle}`,
+    name,
+    paragraphs: [
+      `Votre demande de réservation a bien été transmise à l'hôte : ${stayLine(booking)}`,
+      `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}. Rien n'est dû avant l'accord de l'hôte.`,
+      "L'hôte a 48 heures pour accepter ou refuser votre demande ; vous serez prévenu par e-mail.",
+      "Vos coordonnées ont été transmises à l'hôte pour organiser votre séjour.",
+    ],
+    action: manageUrl
+      ? { label: "Suivre ou annuler ma demande", url: manageUrl }
+      : url
+        ? { label: "Voir mes voyages", url }
+        : undefined,
+    footer: manageUrl
+      ? "Ce lien personnel permet de suivre ou d'annuler votre demande sans compte : ne le partagez pas."
+      : undefined,
   });
 }
 
