@@ -25,7 +25,7 @@ test.describe("Paiement Mobile Money (fournisseur simulé)", () => {
     const done = page.getByRole("status").filter({ has: page.getByRole("heading", { name: "Réservation confirmée !" }) });
     await expect(done).toBeVisible();
     const panel = done.getByRole("region", { name: "Paiement" });
-    await expect(panel.getByText(/^À payer avant le /)).toBeVisible();
+    await expect(panel.getByTestId("payment-badge")).toHaveText(/^À payer avant le /);
     await expect(panel.getByTestId("payment-amount")).toContainText("Montant débité");
 
     await panel.getByRole("button", { name: "Payer avec Mobile Money" }).click();
@@ -44,12 +44,12 @@ test.describe("Paiement Mobile Money (fournisseur simulé)", () => {
       .filter({ has: page.getByRole("link", { name: listing.title }) })
       .filter({ hasText: dates });
     await expect(item).toHaveCount(1);
-    await expect(item.getByText("Payée", { exact: true })).toBeVisible();
+    await expect(item.getByTestId("payment-badge")).toHaveText("Payée");
     await expect(item.getByRole("button", { name: "Payer avec Mobile Money" })).toHaveCount(0);
 
     // Annulation d'une réservation payée : remboursement manuel signalé.
     await item.getByRole("button", { name: "Annuler la réservation" }).click();
     await item.getByRole("group").getByRole("button", { name: "Oui, annuler" }).click();
-    await expect(item.getByText("Remboursement en cours", { exact: true })).toBeVisible();
+    await expect(item.getByTestId("payment-badge")).toHaveText("Remboursement en cours");
   });
 });
