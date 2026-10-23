@@ -24,6 +24,11 @@ const listingsQuerySchema = z.object({
 
 const reviewsQuerySchema = z.object(pagination);
 
+const refundsQuerySchema = z.object({
+  status: z.enum(["REFUND_DUE", "REFUNDED"]).default("REFUND_DUE"),
+  ...pagination,
+});
+
 const roleSchema = z.object({ role: z.enum(["GUEST", "HOST", "ADMIN"]) }).strict();
 const listingStatusSchema = z.object({ status: z.enum(["ACTIVE", "HIDDEN"]) }).strict();
 
@@ -39,5 +44,9 @@ router.get("/listings", validate(listingsQuerySchema, "query"), adminController.
 router.patch("/listings/:id/status", validate(listingStatusSchema), adminController.updateListingStatus);
 router.get("/reviews", validate(reviewsQuerySchema, "query"), adminController.reviews);
 router.delete("/reviews/:id", adminController.deleteReview);
+// Paiements : remboursements manuels (effectués hors application, puis marqués ici).
+router.get("/refunds", validate(refundsQuerySchema, "query"), adminController.refunds);
+router.patch("/bookings/:id/refunded", adminController.markRefunded);
+router.patch("/payments/:id/refunded", adminController.markPaymentRefunded);
 
 export default router;

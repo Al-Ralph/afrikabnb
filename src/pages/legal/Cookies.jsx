@@ -103,6 +103,15 @@ const Cookies = () => {
 
           <section className="legal-section">
             <p>
+              Paiement en ligne (lorsqu’il est activé) : avant la redirection vers la page de
+              paiement, l’entrée afrikabnb_payment_return (stockage de session, effacée à la
+              fermeture de l’onglet, exempte de consentement car nécessaire au service) mémorise la
+              référence du paiement pour afficher son résultat au retour. La page de paiement
+              elle-même est servie par CinetPay, sur son propre domaine : les cookies ou traceurs
+              qu’elle peut déposer relèvent de CinetPay et de sa propre politique, et non du présent
+              Site.
+            </p>
+            <p>
               Le jeton d’accès (valable 15 minutes) n’est conservé qu’en mémoire pendant la visite :
               il n’est plus enregistré dans le stockage local du navigateur (l’ancienne entrée
               afrikabnb_token est supprimée automatiquement). Le bouton « Se déconnecter de tous les

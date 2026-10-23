@@ -29,6 +29,7 @@ vi.mock("./pages/ResetPassword", () => ({ default: () => <div>ResetPasswordPage<
 vi.mock("./pages/Admin", () => ({ default: () => <div>AdminPage</div> }));
 vi.mock("./pages/Checkout", () => ({ default: () => <div>CheckoutPage</div> }));
 vi.mock("./pages/GuestBooking", () => ({ default: () => <div>GuestBookingPage</div> }));
+vi.mock("./pages/PaymentReturn", () => ({ default: () => <div>PaymentReturnPage</div> }));
 
 const routeElement = (path) => document.querySelector(`[data-path="${path}"]`);
 
@@ -52,5 +53,11 @@ describe("App routes (wave 3)", () => {
     expect(routeElement("/reserver/:id")).toHaveTextContent("CheckoutPage");
     expect(routeElement("/reservation/:token")).toHaveTextContent("GuestBookingPage");
     expect(routeElement("/reservation")).toHaveTextContent("GuestBookingPage");
+  });
+
+  test("payment return page is wired (lazy)", async () => {
+    render(<App />);
+    await screen.findByText("PaymentReturnPage");
+    expect(routeElement("/paiement/retour")).toHaveTextContent("PaymentReturnPage");
   });
 });

@@ -1,0 +1,69 @@
+/* Paiement Mobile Money : badges de statut et encart « Payer ». */
+.payment-badge {
+  display: inline-block;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.payment-badge--unpaid {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.payment-badge--paid,
+.payment-badge--refunded {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.payment-badge--refund_due,
+.payment-badge--unpaid_expired {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.payment-panel {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.payment-panel p {
+  margin: 0;
+}
+
+.payment-amount {
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 700;
+}
+
+.payment-muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.payment-error {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  font-size: var(--text-sm);
+}
+
+.payment-pay {
+  justify-self: start;
+}
+
+.payment-return-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
