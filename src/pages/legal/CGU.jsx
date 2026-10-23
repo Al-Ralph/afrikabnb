@@ -41,9 +41,36 @@ const CGU = () => (
             configuration et consentement, des services cartographiques.
           </p>
           <p>
-            Les utilisateurs connectés peuvent enregistrer des favoris, réserver un logement
-            (sans paiement en ligne : la réservation est enregistrée mais aucune transaction
-            financière n’est effectuée) et, après un séjour terminé, publier un avis.
+            Les utilisateurs connectés peuvent enregistrer des favoris, réserver un logement et,
+            après un séjour terminé, publier un avis. Tant que le paiement en ligne n’est pas activé
+            sur le Site, la réservation est enregistrée sans qu’aucune transaction financière ne
+            soit effectuée ; lorsqu’il est activé, les conditions de paiement ci-dessous
+            s’appliquent.
+          </p>
+          <p>
+            <strong>Paiement en ligne (lorsqu’il est activé)</strong> : une réservation confirmée
+            (réservation instantanée, ou demande acceptée par l’hôte) se paie par Mobile Money via
+            le prestataire de paiement <strong>CinetPay</strong>, en francs CFA (XOF), dans le délai
+            indiqué sur la réservation (par défaut 30 minutes pour une réservation instantanée et 24
+            heures après l’acceptation d’une demande). Le montant facturé est le prix total de la
+            réservation, arrondi le cas échéant au multiple de 5 FCFA supérieur exigé par le
+            prestataire ; il est affiché avant tout paiement. Les montants convertis dans une autre
+            devise sont indicatifs. Les dates restent réservées pendant ce délai ; à défaut de
+            paiement confirmé par le prestataire à l’échéance, la réservation est annulée
+            automatiquement et les dates sont libérées. Le paiement est saisi sur la page de
+            CinetPay : AfrikaBnB ne reçoit ni ne conserve vos identifiants Mobile Money.
+          </p>
+          <p>
+            <strong>Annulation et remboursement</strong> : une réservation payée peut être annulée
+            par le voyageur ou l’hôte avant le jour d’arrivée ; le montant payé est alors remboursé
+            au voyageur. De même, un paiement reçu alors que la réservation n’était plus active
+            (annulée ou délai de paiement dépassé) est remboursé et ne réactive pas la réservation.
+            Les remboursements sont traités manuellement par l’éditeur, via le prestataire de
+            paiement ou par transfert Mobile Money ; leur délai dépend du prestataire et de
+            l’opérateur et ne peut être garanti. D’éventuels frais de l’opérateur ou du prestataire
+            peuvent ne pas être remboursables. Ces modalités de démonstration ne constituent pas
+            une politique commerciale définitive ; elles seront précisées avant toute exploitation
+            commerciale.
           </p>
           <p>
             <strong>Réservation sans compte</strong> : il est aussi possible de réserver sans créer

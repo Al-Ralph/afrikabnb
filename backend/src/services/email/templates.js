@@ -24,6 +24,25 @@ export function formatDayFr(day) {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d);
 }
 
+// Date et heure (GMT, heure de Lomé) : "1 novembre 2026 à 14:30 (GMT)".
+export function formatDateTimeFr(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const text = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" }).format(d);
+  return `${text} (GMT)`;
+}
+
+// Paiement attendu (PAYMENTS_ENABLED) : montant exact et échéance ; vide sinon.
+function paymentDueParagraphs(booking, guestAccount) {
+  if (booking.paymentStatus !== "UNPAID" || !booking.paymentDueAt) return [];
+  return [
+    `Paiement Mobile Money à effectuer avant le ${formatDateTimeFr(booking.paymentDueAt)} : ${formatAmount(booking.paymentAmount ?? booking.totalPrice, "XOF")}. Sans paiement à cette échéance, la réservation est annulée automatiquement et les dates sont libérées.`,
+    guestAccount === false
+      ? "Payez depuis le lien de suivi personnel reçu lors de votre demande."
+      : "Payez depuis votre espace « Mes voyages ».",
+  ];
+}
+
 function greeting(name) {
   return name ? `Bonjour ${name},` : "Bonjour,";
 }
@@ -109,6 +128,7 @@ export function bookingConfirmedGuestEmail({ name, booking, url }) {
     paragraphs: [
       `Votre réservation est confirmée : ${stayLine(booking)}`,
       `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}.`,
+      ...paymentDueParagraphs(booking, true),
       "Vos coordonnées ont été transmises à l'hôte pour organiser votre séjour.",
     ],
     action: url ? { label: "Voir mes voyages", url } : undefined,
@@ -167,8 +187,8 @@ export function bookingRequestGuestEmail({ name, booking, url, manageUrl }) {
   });
 }
 
-// Demande acceptée ou refusée : voyageur.
-export function bookingDecisionGuestEmail({ name, accepted, booking, url }) {
+// Demande acceptée ou refusée : voyageur. guestAccount false : réservation sans compte.
+export function bookingDecisionGuestEmail({ name, accepted, booking, url, guestAccount }) {
   return layout({
     subject: accepted
       ? `Demande acceptée : ${booking.listingTitle}`
@@ -178,6 +198,7 @@ export function bookingDecisionGuestEmail({ name, accepted, booking, url }) {
       ? [
           `Bonne nouvelle : l'hôte a accepté votre demande. ${stayLine(booking)}`,
           `Montant total : ${formatAmount(booking.totalPrice, booking.currency)}.`,
+          ...paymentDueParagraphs(booking, guestAccount),
         ]
       : [
           `L'hôte n'a pas pu accepter votre demande pour ${stayLine(booking)}`,
@@ -188,7 +209,8 @@ export function bookingDecisionGuestEmail({ name, accepted, booking, url }) {
 }
 
 // Annulation : destinataire voyageur ou hôte ; cancelledBy : "guest" | "host".
-export function bookingCancelledEmail({ name, recipient, cancelledBy, booking, url }) {
+// refundDue : la réservation était payée (remboursement manuel en cours de traitement).
+export function bookingCancelledEmail({ name, recipient, cancelledBy, booking, url, refundDue = false }) {
   const who =
     recipient === cancelledBy
       ? "Vous avez annulé"
@@ -198,7 +220,81 @@ export function bookingCancelledEmail({ name, recipient, cancelledBy, booking, u
   return layout({
     subject: `Réservation annulée : ${booking.listingTitle}`,
     name,
-    paragraphs: [`${who} la réservation ${stayLine(booking)}`],
+    paragraphs: [
+      `${who} la réservation ${stayLine(booking)}`,
+      ...(refundDue
+        ? [
+            recipient === "host"
+              ? "Le paiement du voyageur lui sera remboursé par AfrikaBnB."
+              : "Votre paiement sera remboursé : remboursement en cours de traitement (délai selon votre opérateur Mobile Money).",
+          ]
+        : []),
+    ],
     action: url ? { label: recipient === "host" ? "Voir mes réservations" : "Voir mes voyages", url } : undefined,
+  });
+}
+
+// Réservation annulée faute de paiement à l'échéance : voyageur ou hôte.
+export function bookingUnpaidCancelledEmail({ name, recipient, booking, url }) {
+  return layout({
+    subject: `Réservation annulée (paiement non reçu) : ${booking.listingTitle}`,
+    name,
+    paragraphs: [
+      recipient === "host"
+        ? `La réservation ${stayLine(booking)} a été annulée : le voyageur n'a pas payé dans le délai prévu. Les dates sont de nouveau disponibles.`
+        : `Votre réservation ${stayLine(booking)} a été annulée : le paiement n'a pas été reçu dans le délai prévu. Aucun montant n'a été débité.`,
+    ],
+    action: url ? { label: recipient === "host" ? "Voir mes réservations" : "Voir mes voyages", url } : undefined,
+  });
+}
+
+// Paiement reçu (vérifié auprès du prestataire) : voyageur ou hôte.
+export function paymentReceivedEmail({ name, recipient, booking, amount, url }) {
+  return layout({
+    subject: `Paiement reçu : ${booking.listingTitle}`,
+    name,
+    paragraphs: [
+      recipient === "host"
+        ? `Le voyageur a payé la réservation ${stayLine(booking)}`
+        : `Votre paiement de ${formatAmount(amount, "XOF")} a bien été reçu pour ${stayLine(booking)}`,
+      recipient === "host" ? `Montant payé : ${formatAmount(amount, "XOF")}.` : "Votre réservation est payée et confirmée.",
+    ],
+    action: url ? { label: recipient === "host" ? "Voir mes réservations" : "Voir mes voyages", url } : undefined,
+  });
+}
+
+// Paiement reçu alors que la réservation n'est plus active (annulée, échue) : voyageur.
+export function refundDueGuestEmail({ name, booking, amount, url }) {
+  return layout({
+    subject: `Paiement à rembourser : ${booking.listingTitle}`,
+    name,
+    paragraphs: [
+      `Nous avons reçu votre paiement de ${formatAmount(amount, "XOF")} pour ${stayLine(booking)}`,
+      "Cette réservation n'étant plus active (annulée ou délai de paiement dépassé), elle n'a pas été réactivée.",
+      "Votre paiement sera remboursé : remboursement en cours de traitement (délai selon votre opérateur Mobile Money).",
+    ],
+    action: url ? { label: "Voir mes voyages", url } : undefined,
+  });
+}
+
+// Alerte administrateur : remboursement manuel à effectuer ou anomalie de paiement.
+// reason : "refund_due" | "duplicate" | "mismatch".
+export function adminPaymentAlertEmail({ reason, booking, transactionId, amount, details, url }) {
+  const titles = {
+    refund_due: "Remboursement à effectuer",
+    duplicate: "Paiement en double à rembourser",
+    mismatch: "Paiement accepté avec un montant ou une devise inattendus",
+  };
+  return layout({
+    subject: `[AfrikaBnB] ${titles[reason] || "Alerte paiement"} : ${booking.listingTitle}`,
+    name: null,
+    paragraphs: [
+      `${titles[reason] || "Alerte paiement"} pour ${stayLine(booking)}`,
+      ...(transactionId ? [`Transaction : ${oneLine(transactionId)}.`] : []),
+      ...(amount != null ? [`Montant : ${formatAmount(amount, "XOF")}.`] : []),
+      ...(details ? [`Détails : ${oneLine(details)}`] : []),
+      "Effectuer le remboursement depuis le back-office CinetPay (ou auprès du voyageur), puis le marquer « remboursé » dans l'administration AfrikaBnB.",
+    ],
+    action: url ? { label: "Ouvrir l'administration", url } : undefined,
   });
 }

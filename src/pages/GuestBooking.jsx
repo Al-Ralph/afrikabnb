@@ -6,6 +6,7 @@ import { api, toIsoDay } from "../api/client";
 import { formatDay } from "../utils/format";
 import { interpolate } from "../utils/plural";
 import EmptyState from "../components/EmptyState";
+import PaymentPanel from "../components/payment/PaymentPanel";
 import "./Checkout.css";
 
 const CANCELLABLE = ["PENDING", "CONFIRMED"];
@@ -142,6 +143,8 @@ const GuestBooking = () => {
             <dd>{formatAmount(booking.totalPrice, currency)}</dd>
           </div>
         </dl>
+
+        <PaymentPanel booking={booking} guestToken={token} start={(lang) => api.startGuestPayment(token, lang)} />
 
         {notice && (
           <p className="checkout-notice" role="status">

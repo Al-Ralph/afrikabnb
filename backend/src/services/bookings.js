@@ -2,6 +2,7 @@
 // Sans req/res : erreurs métier levées via httpError, client Prisma injectable (`db`).
 import { Prisma } from "@prisma/client";
 import prisma from "../config/db.js";
+import { config } from "../config/env.js";
 import { listingBaseInclude } from "../api/listings/listings.serializers.js";
 import { httpError } from "../utils/httpError.js";
 import {
@@ -19,7 +20,9 @@ import {
   expiredPendingWhere,
   findStayConflict,
   nextStatus,
+  overdueUnpaidWhere,
 } from "../utils/bookingStatus.js";
+import { PAYMENT_GRACE_MS, paymentDueDate } from "../utils/payment.js";
 
 export const publicPerson = { select: { id: true, name: true, avatar: true } };
 
@@ -43,12 +46,70 @@ export function sweepExpired(where, db = prisma) {
   return db.booking.updateMany({ where: { ...where, ...expiredPendingWhere() }, data: { status: "EXPIRED" } });
 }
 
+// Paiements actifs : une réservation CONFIRMED non payée à son échéance est annulée en base.
+// - Seulement après le délai de grâce (paymentDueAt <= now - PAYMENT_GRACE_MS), le même que celui
+//   accordé à un paiement accepté tardivement (services/payments.js, syncPayment) ; les dates sont,
+//   elles, libérées dès l'échéance (utils/bookingStatus.js).
+// - Avant d'annuler une réservation ayant un paiement PENDING (avec lien), le paiement est vérifié
+//   auprès du prestataire (hors transaction, au plus `maxChecks` appels par balayage). Prestataire
+//   injoignable, ou plafond d'appels atteint : la réservation n'est PAS annulée (nouvel essai au
+//   prochain balayage) ; un paiement accepté est appliqué par syncPayment.
+// - Annulation conditionnelle ligne par ligne : un seul appelant concurrent effectue la transition.
+// paymentDeps : dépendances de services/payments.js (provider, onSync…).
+// -> identifiants effectivement annulés faute de paiement (e-mails envoyés par l'appelant).
+export async function sweepUnpaid(where, db = prisma, now = new Date(), { maxChecks = 3, ...paymentDeps } = {}) {
+  if (!config.payments.enabled) return [];
+  const overdue = overdueUnpaidWhere(new Date(now.getTime() - PAYMENT_GRACE_MS));
+  const candidates = await db.booking.findMany({ where: { ...where, ...overdue }, select: { id: true }, take: 50 });
+  if (candidates.length === 0) return [];
+  const pending = await db.payment.findMany({
+    where: { bookingId: { in: candidates.map((c) => c.id) }, status: "PENDING", paymentUrl: { not: null } },
+    select: { bookingId: true, transactionId: true },
+  });
+  const keep = new Set();
+  if (pending.length) {
+    // Import différé : services/payments.js importe ce module.
+    const { syncPayment } = await import("./payments.js");
+    let checks = 0;
+    for (const p of pending) {
+      if (keep.has(p.bookingId)) continue;
+      if (checks >= maxChecks) {
+        keep.add(p.bookingId);
+        continue;
+      }
+      checks += 1;
+      try {
+        const result = await syncPayment({ transactionId: p.transactionId }, { ...paymentDeps, db, now });
+        paymentDeps.onSync?.(result);
+      } catch (error) {
+        paymentDeps.onSync?.({ outcome: "error", transactionId: p.transactionId, error });
+        keep.add(p.bookingId);
+      }
+    }
+  }
+  const cancelled = [];
+  for (const { id } of candidates) {
+    if (keep.has(id)) continue;
+    const { count } = await db.booking.updateMany({ where: { id, ...overdue }, data: { status: "CANCELLED" } });
+    if (count === 1) cancelled.push(id);
+  }
+  return cancelled;
+}
+
 // Réservations et périodes bloquées qui pourraient chevaucher [start, end[ (à affiner par findStayConflict).
-async function overlapping(tx, listingId, start, end) {
+export async function overlapping(tx, listingId, start, end) {
   const [bookings, blockedPeriods] = await Promise.all([
     tx.booking.findMany({
       where: { listingId, status: { in: ["PENDING", "CONFIRMED"] }, checkIn: { lt: end }, checkOut: { gt: start } },
-      select: { id: true, status: true, createdAt: true, checkIn: true, checkOut: true },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        checkIn: true,
+        checkOut: true,
+        // Paiements actifs : échéance de paiement (une réservation impayée à l'échéance ne bloque plus).
+        ...(config.payments.enabled ? { paymentStatus: true, paymentDueAt: true } : {}),
+      },
     }),
     tx.blockedPeriod.findMany({
       where: { listingId, startDate: { lt: end }, endDate: { gt: start } },
@@ -133,6 +194,12 @@ export async function createBooking({ listingId, user, checkIn, checkOut, guests
     }
 
     const access = anonymous ? generateGuestAccessToken(checkOut) : null;
+    // Paiements actifs : une réservation instantanée confirmée est à payer sous peu (dates bloquées
+    // jusqu'à l'échéance).
+    const payment =
+      status === "CONFIRMED" && config.payments.enabled
+        ? { paymentStatus: "UNPAID", paymentDueAt: paymentDueDate("instant", config.payments) }
+        : {};
     const booking = await tx.booking.create({
       data: {
         listingId,
@@ -145,6 +212,7 @@ export async function createBooking({ listingId, user, checkIn, checkOut, guests
         ...fields,
         guestAccessTokenHash: access?.tokenHash ?? null,
         guestAccessExpiresAt: access?.expiresAt ?? null,
+        ...payment,
       },
       include: guestBookingInclude,
     });
@@ -229,8 +297,16 @@ async function transition(bookingId, user, action, allowed, db) {
         throw httpError(409, "Ces dates ne sont plus disponibles");
       }
     }
-    await tx.booking.update({ where: { id: booking.id }, data: { status: result.status } });
-    return { booking, changed: true, by };
+    const data = { status: result.status };
+    // Demande acceptée, paiements actifs : à payer avant l'échéance.
+    if (result.status === "CONFIRMED" && config.payments.enabled) {
+      data.paymentStatus = "UNPAID";
+      data.paymentDueAt = paymentDueDate("request", config.payments);
+    }
+    // Annulation d'une réservation payée : remboursement manuel par l'administrateur.
+    if (result.status === "CANCELLED" && booking.paymentStatus === "PAID") data.paymentStatus = "REFUND_DUE";
+    await tx.booking.update({ where: { id: booking.id }, data });
+    return { booking, changed: true, by, refundDue: data.paymentStatus === "REFUND_DUE" };
   });
   // Erreur métier levée après le commit (persistance éventuelle de EXPIRED conservée).
   if (outcome.error) throw httpError(outcome.error.code, outcome.error.error);
@@ -238,7 +314,7 @@ async function transition(bookingId, user, action, allowed, db) {
     where: { id: outcome.booking.id },
     include: { ...guestBookingInclude, guest: publicPerson },
   });
-  return { booking: updated, changed: outcome.changed, by: outcome.by };
+  return { booking: updated, changed: outcome.changed, by: outcome.by, refundDue: Boolean(outcome.refundDue) };
 }
 
 const hostOnly = (b, user) => (b.listing.hostId !== user.id ? "Seul l'hôte peut répondre à cette demande" : null);
@@ -259,7 +335,7 @@ export function cancelBooking({ bookingId, user }, db = prisma) {
 
 // Réservation sans compte retrouvée par l'empreinte de son jeton d'accès. Jeton mal formé, inconnu
 // ou expiré : 404 générique (aucune information sur l'existence de la réservation).
-async function findByGuestToken(token, include, db) {
+export async function findByGuestToken(token, include, db = prisma) {
   const notFound = () => httpError(404, "Réservation introuvable");
   if (!isGuestAccessTokenFormat(token)) throw notFound();
   const booking = await db.booking.findUnique({
@@ -291,22 +367,29 @@ export function declineBooking({ bookingId, user }, db = prisma) {
   return transition(bookingId, user, "decline", hostOnly, db);
 }
 
-// Réservations du voyageur (balayage des demandes expirées d'abord).
-export async function listGuestBookings(userId, db = prisma) {
+// Réservations du voyageur (balayage des demandes expirées et des impayées d'abord).
+// -> { bookings, unpaidCancelled } : identifiants annulés faute de paiement (à notifier ; toujours
+// vide si les paiements sont désactivés).
+export async function listGuestBookings(userId, db = prisma, paymentDeps = {}) {
   await sweepExpired({ guestId: userId }, db);
-  return db.booking.findMany({
+  const unpaidCancelled = await sweepUnpaid({ guestId: userId }, db, new Date(), paymentDeps);
+  const bookings = await db.booking.findMany({
     where: { guestId: userId },
     include: guestBookingInclude,
     orderBy: { checkIn: "desc" },
   });
+  return { bookings, unpaidCancelled };
 }
 
-// Réservations reçues sur les annonces de l'hôte (balayage des demandes expirées d'abord).
-export async function listHostBookings(hostId, db = prisma) {
+// Réservations reçues sur les annonces de l'hôte (balayage des demandes expirées et des impayées d'abord).
+// -> { bookings, unpaidCancelled } (voir listGuestBookings).
+export async function listHostBookings(hostId, db = prisma, paymentDeps = {}) {
   await sweepExpired({ listing: { hostId } }, db);
-  return db.booking.findMany({
+  const unpaidCancelled = await sweepUnpaid({ listing: { hostId } }, db, new Date(), paymentDeps);
+  const bookings = await db.booking.findMany({
     where: { listing: { hostId } },
     include: hostBookingInclude,
     orderBy: { checkIn: "desc" },
   });
+  return { bookings, unpaidCancelled };
 }

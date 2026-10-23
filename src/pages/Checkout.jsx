@@ -8,6 +8,8 @@ import { formatDay, formatPrice, nightsBetween } from "../utils/format";
 import { interpolate } from "../utils/plural";
 import { countryOptions } from "../components/booking/countries";
 import EmptyState from "../components/EmptyState";
+import PaymentPanel from "../components/payment/PaymentPanel";
+import { usePaymentsConfig } from "../hooks/usePaymentsConfig";
 import "./Checkout.css";
 
 export const NAME_MAX = 100;
@@ -76,6 +78,7 @@ const Checkout = () => {
   const { t, language } = useLanguage();
   const { user, openAuth } = useAuth();
   const { formatAmount, isConverted } = useCurrency();
+  const payments = usePaymentsConfig();
 
   const initialListing = location.state?.listing?.id === id ? location.state.listing : null;
   const [listing, setListing] = useState(initialListing);
@@ -258,7 +261,7 @@ const Checkout = () => {
           })}
         </p>
       )}
-      <p className="checkout-muted">{t("booking.noCharge")}</p>
+      <p className="checkout-muted">{payments.enabled ? t("payment.checkoutNote") : t("booking.noCharge")}</p>
     </section>
   );
 
@@ -273,6 +276,8 @@ const Checkout = () => {
             </h1>
             <p>{pending ? t("checkout.sentText") : t("checkout.confirmedText")}</p>
             <p>{interpolate(t("checkout.emailSent"), { email: booking.contactEmail })}</p>
+            <PaymentPanel booking={booking} start={(lang) => api.startBookingPayment(booking.id, lang)} />
+            {payments.enabled && pending && booking.manageUrl && <p>{t("payment.afterAcceptance")}</p>}
             {/^https?:\/\//.test(booking.manageUrl || "") ? (
               <div className="checkout-manage">
                 <h2 className="checkout-section-title">{t("checkout.manageTitle")}</h2>

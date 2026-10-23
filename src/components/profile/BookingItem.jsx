@@ -6,6 +6,7 @@ import { formatPrice, formatDay } from "../../utils/format";
 import { interpolate } from "../../utils/plural";
 import { apiErrorMessage } from "./errorMessage";
 import ReviewForm from "./ReviewForm";
+import PaymentPanel from "../payment/PaymentPanel";
 
 // Échéance de réponse de l'hôte (ISO) -> « 24 oct. 2026, 14:30 ».
 function formatDeadline(iso, language) {
@@ -88,6 +89,9 @@ const BookingItem = ({ booking, kind, today, onChange }) => {
           <p className="booking-item-hint">{interpolate(t("bookingStatus.pendingUntil"), { date: deadline })}</p>
         )}
         {status === "DECLINED" && <p className="booking-item-hint">{t("bookingStatus.declinedHint")}</p>}
+        {kind !== "past" && (
+          <PaymentPanel booking={booking} start={(lang) => api.startBookingPayment(booking.id, lang)} />
+        )}
         {status === "EXPIRED" && <p className="booking-item-hint">{t("bookingStatus.expiredHint")}</p>}
         {booking.hasReview && !notice && <p className="booking-item-reviewed">{t("bookings.reviewed")}</p>}
         {notice && <p className="account-alert account-alert-success" role="status">{notice}</p>}

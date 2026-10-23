@@ -68,3 +68,26 @@ services:
         sync: false
       - key: APP_URL
         sync: false
+
+      # --- Paiement Mobile Money (CinetPay, DEPLOY.md « Paiement CinetPay ») ---
+      # Désactivé par défaut : passer PAYMENTS_ENABLED à "true" une fois les clés CinetPay renseignées.
+      - key: PAYMENTS_ENABLED
+        value: "false"
+      - key: PAYMENT_PROVIDER
+        value: cinetpay
+      # Délais de paiement : réservation instantanée (minutes), demande acceptée (heures).
+      - key: PAYMENT_DUE_MINUTES_INSTANT
+        value: "30"
+      - key: PAYMENT_DUE_HOURS_REQUEST
+        value: "24"
+      # Back-office CinetPay → Intégrations : apikey, site_id, clé secrète (HMAC des notifications).
+      - key: CINETPAY_API_KEY
+        sync: false
+      - key: CINETPAY_SITE_ID
+        sync: false
+      - key: CINETPAY_SECRET_KEY
+        sync: false
+      # URL publique vue par CinetPay pour notify_url / return_url (défaut : APP_URL, via la
+      # réécriture Vercel /api/* → Render). Ex. https://afrikabnb.vercel.app
+      - key: API_PUBLIC_URL
+        sync: false

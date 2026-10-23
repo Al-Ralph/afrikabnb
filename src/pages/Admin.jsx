@@ -8,21 +8,27 @@ import AdminOverview from "../components/admin/AdminOverview";
 import AdminUsers from "../components/admin/AdminUsers";
 import AdminListings from "../components/admin/AdminListings";
 import AdminReviews from "../components/admin/AdminReviews";
+import AdminRefunds from "../components/admin/AdminRefunds";
+import { usePaymentsConfig } from "../hooks/usePaymentsConfig";
 import { useAuth, OPEN_AUTH_EVENT } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import "./Host.css";
 import "./Admin.css";
 
 export const ADMIN_TABS = ["overview", "users", "listings", "reviews"];
+// Onglet supplémentaire quand les paiements sont activés (remboursements manuels).
+export const REFUNDS_TAB = "refunds";
 
 // Administration (rôle ADMIN). L'API protège chaque route ; l'interface masque simplement
 // l'espace aux autres rôles.
 const Admin = () => {
   const { t } = useLanguage();
   const { user, loading } = useAuth();
+  const payments = usePaymentsConfig();
+  const tabs = payments.enabled ? [...ADMIN_TABS, REFUNDS_TAB] : ADMIN_TABS;
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab = ADMIN_TABS.includes(tabParam) ? tabParam : "overview";
+  const tab = tabs.includes(tabParam) ? tabParam : "overview";
 
   const setTab = (id) => {
     setSearchParams((prev) => {
@@ -74,13 +80,14 @@ const Admin = () => {
           label={t("admin.tabs.label")}
           active={tab}
           onChange={setTab}
-          tabs={ADMIN_TABS.map((id) => ({ id, label: t(`admin.tabs.${id}`) }))}
+          tabs={tabs.map((id) => ({ id, label: t(`admin.tabs.${id}`) }))}
         />
         <TabPanel idPrefix="admin" id={tab}>
           {tab === "overview" && <AdminOverview />}
           {tab === "users" && <AdminUsers currentUserId={user.id} />}
           {tab === "listings" && <AdminListings />}
           {tab === "reviews" && <AdminReviews />}
+          {tab === REFUNDS_TAB && <AdminRefunds />}
         </TabPanel>
       </>
     );

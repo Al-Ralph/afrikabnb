@@ -15,6 +15,8 @@ export const redactPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
   'req.headers["x-api-key"]',
+  // Signature HMAC des notifications CinetPay.
+  'req.headers["x-token"]',
   'res.headers["set-cookie"]',
 ];
 
@@ -34,10 +36,14 @@ export const logger = pino(
   await developmentStream()
 );
 
-// Jetons portés par le chemin de l'URL (lien de suivi d'une réservation sans compte) : masqués
-// dans les logs de requête et d'erreur.
+// Jetons portés par l'URL (lien de suivi d'une réservation sans compte, identifiant de transaction
+// de paiement dans le chemin ou le paramètre `tx`) : masqués dans les logs de requête et d'erreur.
 export function maskSensitiveUrl(url) {
-  return typeof url === "string" ? url.replace(/(\/api\/guest-bookings\/)[^/?#]+/, "$1[masqué]") : url;
+  if (typeof url !== "string") return url;
+  return url
+    .replace(/(\/api\/guest-bookings\/)[^/?#]+/, "$1[masqué]")
+    .replace(/(\/api\/payments\/(?:fake\/)?)AFB[^/?#]*/, "$1[masqué]")
+    .replace(/(\/api\/payments\/[^?#]*\?(?:[^#]*&)?tx=)[^&#]*/, "$1[masqué]");
 }
 
 const VALID_REQUEST_ID = /^[A-Za-z0-9._-]{8,128}$/;
@@ -57,6 +63,7 @@ export const httpLogger = pinoHttp({
     req: (req) => {
       req.url = maskSensitiveUrl(req.url);
       if (req.params?.token) req.params = { ...req.params, token: "[masqué]" };
+      if (req.params?.transactionId) req.params = { ...req.params, transactionId: "[masqué]" };
       return req;
     },
     res: (res) => ({ statusCode: res.statusCode }),
