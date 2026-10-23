@@ -1,0 +1,70 @@
+# Blueprint Render de l'API AfrikaBnB (voir DEPLOY.md, étape 3).
+# Render → New → Blueprint → choisir ce dépôt : ce fichier crée le service web Docker.
+# Aucune valeur secrète ici : les variables `sync: false` sont demandées par Render à la création
+# du Blueprint (puis modifiables dans Service → Environment). Ne jamais les commiter.
+services:
+  - type: web
+    name: afrikabnb-api
+    runtime: docker
+    # Dépôt monorepo : le Dockerfile et son contexte sont relatifs au dossier backend/.
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: frankfurt
+    # Offre gratuite : le service s'endort après ~15 min sans trafic, le réveil prend ~50 s.
+    plan: free
+    healthCheckPath: /health
+    # Redéploiement à chaque push sur la branche suivie (seulement si backend/ a changé : rootDir).
+    autoDeploy: true
+    envVars:
+      # --- Valeurs non secrètes ---
+      - key: NODE_ENV
+        value: production
+      # Proxys devant l'API : réécriture Vercel (/api/* → Render) + répartiteur de charge Render.
+      # Vercel remplace X-Forwarded-For par l'IP du client ; Render y ajoute l'IP de Vercel.
+      # 2 = l'IP du client est retenue pour le rate limiting (voir DEPLOY.md, « TRUST_PROXY »).
+      - key: TRUST_PROXY
+        value: "2"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: listing-images
+      - key: EMAIL_DRIVER
+        value: resend
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: REFRESH_TTL_DAYS
+        value: "30"
+      - key: LOG_LEVEL
+        value: info
+      # PORT n'est pas défini ici : Render l'injecte (10000 par défaut) et src/config/env.js le lit.
+
+      # --- Secret généré par Render (48 octets aléatoires, jamais affiché ailleurs) ---
+      - key: JWT_SECRET
+        generateValue: true
+
+      # --- À renseigner dans Render (DEPLOY.md, « Variables par service ») ---
+      # Supabase UE, Transaction pooler (port 6543) + ?pgbouncer=true&connection_limit=1&sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # Supabase UE, Session pooler (port 5432) + ?sslmode=require (utilisée par prisma migrate deploy)
+      - key: DIRECT_URL
+        sync: false
+      # https://<ref>.supabase.co
+      - key: SUPABASE_URL
+        sync: false
+      # Clé service_role / secret Supabase : serveur uniquement (jamais dans Vercel ni VITE_*).
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      # Ex. AfrikaBnB <no-reply@votre-domaine> (domaine vérifié dans Resend)
+      - key: EMAIL_FROM
+        sync: false
+      # URL Vercel du frontend, ex. https://afrikabnb.vercel.app (sans / final)
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false

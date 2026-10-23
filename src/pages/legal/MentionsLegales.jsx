@@ -9,7 +9,7 @@ const MentionsLegales = () => (
       <div className="legal-page-inner">
         <Link to="/" className="legal-back">← Accueil</Link>
         <h1 className="legal-page-title">Mentions légales</h1>
-        <p className="legal-page-meta">Dernière mise à jour : 19 octobre 2026 · Site de démonstration</p>
+        <p className="legal-page-meta">Dernière mise à jour : 22 octobre 2026 · Site de démonstration</p>
 
         <section className="legal-section">
           <h2>1. Éditeur du site</h2>
@@ -36,13 +36,37 @@ const MentionsLegales = () => (
 
         <section className="legal-section">
           <h2>3. Hébergement</h2>
+          {/* APRÈS MIGRATION vers la base UE (DEPLOY.md, étape 1) : retirer ce paragraphe sur la
+              version de démonstration (us-west-2). */}
           <p>
-            À la date de cette page, le Site est exploité en environnement de développement /
-            démonstration locale. Aucun hébergeur de production n’est encore désigné.
+            Version de démonstration actuelle : exploitée en environnement de développement, avec
+            une base de données Supabase hébergée aux États-Unis (AWS, région us-west-2). La
+            version mise en ligne utilise les hébergeurs ci-dessous, avec une base de données en
+            région Union européenne.
           </p>
+          <ul>
+            <li>
+              Pages du Site (frontend) : <strong>Vercel Inc.</strong>, 440 N Barranca Ave #4133,
+              Covina, CA 91723, États-Unis — diffusion via un réseau mondial de serveurs —
+              vercel.com. Téléphone : <span className="legal-todo">[À COMPLÉTER]</span>
+            </li>
+            <li>
+              API (serveur applicatif) : <strong>Render Services, Inc.</strong>, 525 Brannan Street,
+              Suite 300, San Francisco, CA 94107, États-Unis — serveurs de la région de Francfort
+              (Allemagne) — render.com. Téléphone : <span className="legal-todo">[À COMPLÉTER]</span>
+            </li>
+            <li>
+              Base de données et photos : <strong>Supabase</strong>, région Union européenne —
+              supabase.com. Adresse et téléphone :{" "}
+              <span className="legal-todo">[À COMPLÉTER — voir les conditions de Supabase]</span>
+            </li>
+            <li>
+              E-mails transactionnels : <strong>Resend</strong> (États-Unis) — resend.com.
+            </li>
+          </ul>
           <p>
-            Hébergeur (lorsque le Site sera mis en ligne) :{" "}
-            <span className="legal-todo">[À COMPLÉTER — nom, adresse, téléphone]</span>
+            Coordonnées des hébergeurs à vérifier dans leurs conditions d’utilisation au moment de
+            la mise en ligne.
           </p>
         </section>
 

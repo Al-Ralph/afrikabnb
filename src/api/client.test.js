@@ -104,6 +104,39 @@ describe("api client", () => {
   });
 });
 
+describe("gateway errors (API waking up behind the Vercel rewrite)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("retries a GET after 502/504, then returns the API response", async () => {
+    vi.useFakeTimers();
+    global.fetch
+      .mockResolvedValueOnce(jsonResponse({}, { status: 502, statusText: "Bad Gateway" }))
+      .mockResolvedValueOnce(jsonResponse({}, { status: 504, statusText: "Gateway Timeout" }))
+      .mockResolvedValueOnce(jsonResponse({ data: [], total: 0 }));
+    const pending = api.getListings();
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toMatchObject({ data: [] });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  test("gives up after the last retry with the gateway status", async () => {
+    vi.useFakeTimers();
+    global.fetch.mockResolvedValue(jsonResponse({}, { status: 503, statusText: "Service Unavailable" }));
+    const pending = api.getListings().catch((e) => e);
+    await vi.runAllTimersAsync();
+    expect(await pending).toMatchObject({ status: 503 });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  test("never replays a non-GET request", async () => {
+    global.fetch.mockResolvedValue(jsonResponse({}, { status: 502, statusText: "Bad Gateway" }));
+    await expect(api.login("a@b.c", "x")).rejects.toMatchObject({ status: 502 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("isApiUnreachable", () => {
   test("true for network errors and 5xx, false for 4xx", () => {
     expect(isApiUnreachable({ network: true })).toBe(true);
