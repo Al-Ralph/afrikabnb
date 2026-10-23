@@ -17,6 +17,9 @@ export const SESSION_EXPIRED_EVENT = "afrikabnb:session-expired";
 // En-tête exigé par /api/auth/refresh et /api/auth/logout (défense CSRF).
 const APP_HEADER = { "X-Requested-With": "afrikabnb" };
 
+// Délais avant chaque nouvel essai d'un GET refusé par la passerelle (voir send).
+const GATEWAY_RETRY_DELAYS_MS = [4000, 8000];
+
 let accessToken = null;
 
 export function setAccessToken(token) {
@@ -44,14 +47,21 @@ async function send(path, options, token) {
     init.credentials = "include";
     Object.assign(headers, APP_HEADER);
   }
+  // Lectures (GET) : rejouées après une erreur de passerelle (502/503/504), typiquement l'API
+  // hébergée sur l'offre gratuite de Render qui se réveille (~50 s) derrière la réécriture Vercel.
+  const retryable = !options.method || options.method.toUpperCase() === "GET";
   let res;
-  try {
-    res = await fetch(url, init);
-  } catch (cause) {
-    const err = new Error("API injoignable");
-    err.network = true;
-    err.cause = cause;
-    throw err;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(url, init);
+    } catch (cause) {
+      const err = new Error("API injoignable");
+      err.network = true;
+      err.cause = cause;
+      throw err;
+    }
+    if (!retryable || attempt >= GATEWAY_RETRY_DELAYS_MS.length || ![502, 503, 504].includes(res.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, GATEWAY_RETRY_DELAYS_MS[attempt]));
   }
   const data = await res.json().catch(() => ({}));
   return { res, data };
