@@ -188,6 +188,46 @@ if (isProduction && emailDriver === "console") {
   warnings.push("EMAIL_DRIVER=console en production : aucun email n'est envoyé (contenu non journalisé).");
 }
 
+// Paiements (vague 6) : désactivés par défaut. PAYMENTS_ENABLED=true active le paiement Mobile Money
+// des réservations confirmées ; PAYMENT_PROVIDER : "cinetpay" (réel) ou "fake" (simulé, dev/tests,
+// refusé en production). Les clés CinetPay ne quittent jamais le serveur.
+const paymentsFlag = (process.env.PAYMENTS_ENABLED || "").trim().toLowerCase();
+if (!["", "true", "false"].includes(paymentsFlag)) errors.push('PAYMENTS_ENABLED doit valoir "true" ou "false".');
+const paymentsEnabled = paymentsFlag === "true";
+const paymentProvider = (process.env.PAYMENT_PROVIDER || "cinetpay").trim().toLowerCase();
+const cinetpayApiKey = process.env.CINETPAY_API_KEY || "";
+const cinetpaySiteId = (process.env.CINETPAY_SITE_ID || "").trim();
+const cinetpaySecretKey = process.env.CINETPAY_SECRET_KEY || "";
+// URL publique de l'API vue par CinetPay (notify_url, return_url) : par défaut APP_URL, l'API étant
+// servie sur la même origine (réécriture Vercel /api/* en production, proxy Vite en développement).
+const paymentApiUrl = stripSlash(process.env.API_PUBLIC_URL || appUrl);
+const intInRange = (name, fallback, min, max) => {
+  const raw = process.env[name];
+  const value = raw ? Number(raw) : fallback;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    errors.push(`${name} doit être un entier entre ${min} et ${max}.`);
+    return fallback;
+  }
+  return value;
+};
+const paymentDueMinutesInstant = intInRange("PAYMENT_DUE_MINUTES_INSTANT", 30, 5, 1440);
+const paymentDueHoursRequest = intInRange("PAYMENT_DUE_HOURS_REQUEST", 24, 1, 168);
+if (paymentsEnabled) {
+  if (!["cinetpay", "fake"].includes(paymentProvider)) {
+    errors.push('PAYMENT_PROVIDER doit valoir "cinetpay" ou "fake".');
+  } else if (paymentProvider === "fake" && isProduction) {
+    errors.push("PAYMENT_PROVIDER=fake (paiement simulé) refusé en production.");
+  } else if (paymentProvider === "cinetpay") {
+    const missing = ["CINETPAY_API_KEY", "CINETPAY_SITE_ID", "CINETPAY_SECRET_KEY"].filter((k) => !process.env[k]);
+    if (missing.length) errors.push(`PAYMENT_PROVIDER=cinetpay : renseigner ${missing.join(", ")}.`);
+  }
+  if (!isHttpUrl(paymentApiUrl)) {
+    errors.push("API_PUBLIC_URL doit être une URL http(s) (URL publique de l'API pour les notifications de paiement).");
+  } else if (isProduction && !paymentApiUrl.startsWith("https://")) {
+    errors.push("API_PUBLIC_URL (ou APP_URL) doit être en https en production (notifications de paiement).");
+  }
+}
+
 if (errors.length > 0) {
   for (const e of errors) console.error(`[config] ERREUR : ${e}`);
   console.error("[config] Démarrage refusé.");
@@ -222,6 +262,18 @@ export const config = Object.freeze({
     driver: emailDriver,
     resendApiKey,
     from: emailFrom,
+  }),
+  payments: Object.freeze({
+    enabled: paymentsEnabled,
+    provider: paymentsEnabled ? paymentProvider : null,
+    apiUrl: paymentApiUrl,
+    dueMinutesInstant: paymentDueMinutesInstant,
+    dueHoursRequest: paymentDueHoursRequest,
+    cinetpay: Object.freeze({
+      apiKey: cinetpayApiKey,
+      siteId: cinetpaySiteId,
+      secretKey: cinetpaySecretKey,
+    }),
   }),
 });
 

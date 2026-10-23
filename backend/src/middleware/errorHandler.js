@@ -39,7 +39,10 @@ export const errorHandler = (err, req, res, next) => {
   if (status >= 500) {
     // req.log (pino-http) porte déjà l'id de requête ; repli sur le logger racine hors requête HTTP.
     (req.log || logger).error({ err, reqId: req.id }, `${req.method} ${maskSensitiveUrl(req.originalUrl)} : erreur serveur`);
-    return res.status(status).json({ error: "Erreur serveur", requestId: req.id });
+    // `expose: true` : message métier volontairement public (ex. prestataire de paiement indisponible) ;
+    // toute autre erreur 5xx reste générique.
+    const error = err.expose === true && err.message ? err.message : "Erreur serveur";
+    return res.status(status).json({ error, requestId: req.id });
   }
   res.status(status).json({ error: message || "Requête invalide" });
 };

@@ -7,6 +7,8 @@ import { interpolate } from "../../utils/plural";
 import { countryName } from "../booking/countries";
 import ConfirmButton from "./ConfirmButton";
 import EmptyState from "../EmptyState";
+import PaymentBadge from "../payment/PaymentBadge";
+import { usePaymentsConfig } from "../../hooks/usePaymentsConfig";
 import "./HostBookings.css";
 
 export const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "DECLINED", "EXPIRED", "CANCELLED"];
@@ -111,6 +113,7 @@ function useNow(intervalMs = 60000) {
 const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
   const { t, language } = useLanguage();
   const { formatAmount } = useCurrency();
+  const payments = usePaymentsConfig();
   const [filter, setFilter] = useState("ALL");
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -231,6 +234,9 @@ const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
                     {t(`host.status.${status}`)}
                   </span>
                   <strong>{formatAmount(b.totalPrice, b.currency || b.listing?.currency)}</strong>
+                  {payments.enabled && status !== "PENDING" && (
+                    <PaymentBadge booking={{ ...b, status }} label={t("payment.hostUnpaid")} />
+                  )}
                   {status === "PENDING" && (
                     <div className="host-booking-actions">
                       <ConfirmButton

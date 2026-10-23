@@ -1,5 +1,7 @@
 import * as listingsService from "../../services/listings.js";
 import { listHostBookings } from "../../services/bookings.js";
+import { notifyBooking } from "../bookings/bookings.notifications.js";
+import { handleSyncOutcome } from "../payments/payments.notifications.js";
 import { listingToJson } from "./listings.serializers.js";
 import { bookingWithContactToJson } from "../bookings/bookings.serializers.js";
 
@@ -44,8 +46,11 @@ export async function mine(req, res, next) {
 // voyageur (hôte de l'annonce uniquement : filtre listing.hostId du service).
 export async function mineBookings(req, res, next) {
   try {
-    const bookings = await listHostBookings(req.user.id);
+    const { bookings, unpaidCancelled } = await listHostBookings(req.user.id, undefined, {
+      onSync: (result) => handleSyncOutcome(result, req.log),
+    });
     res.json({ data: bookings.map((b) => bookingWithContactToJson(b)) });
+    for (const id of unpaidCancelled) notifyBooking("unpaid", id, req.log);
   } catch (err) {
     next(err);
   }

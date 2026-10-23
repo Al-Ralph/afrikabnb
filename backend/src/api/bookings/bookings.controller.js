@@ -1,6 +1,7 @@
 import * as bookingsService from "../../services/bookings.js";
 import { bookingToJson, bookingWithContactToJson } from "./bookings.serializers.js";
 import { notifyBooking } from "./bookings.notifications.js";
+import { handleSyncOutcome } from "../payments/payments.notifications.js";
 import { appLink } from "../../services/email/index.js";
 
 // Lien de suivi d'une réservation sans compte (page frontend /reservation/:token).
@@ -47,7 +48,9 @@ export async function cancel(req, res, next) {
   try {
     const outcome = await bookingsService.cancelBooking({ bookingId: req.params.id, user: req.user });
     res.json(bookingWithContactToJson(outcome.booking));
-    if (outcome.changed) notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: outcome.by });
+    if (outcome.changed) {
+      notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: outcome.by, refundDue: outcome.refundDue });
+    }
   } catch (err) {
     next(err);
   }
@@ -78,8 +81,11 @@ export async function decline(req, res, next) {
 // GET /api/users/me/bookings : réservations du voyageur connecté.
 export async function listMine(req, res, next) {
   try {
-    const bookings = await bookingsService.listGuestBookings(req.user.id);
+    const { bookings, unpaidCancelled } = await bookingsService.listGuestBookings(req.user.id, undefined, {
+      onSync: (result) => handleSyncOutcome(result, req.log),
+    });
     res.json({ data: bookings.map((b) => bookingWithContactToJson(b)) });
+    for (const id of unpaidCancelled) notifyBooking("unpaid", id, req.log);
   } catch (err) {
     next(err);
   }
@@ -99,7 +105,9 @@ export async function cancelGuest(req, res, next) {
   try {
     const outcome = await bookingsService.cancelGuestBooking({ token: req.params.token });
     res.json(bookingToJson(outcome.booking));
-    if (outcome.changed) notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: "guest" });
+    if (outcome.changed) {
+      notifyBooking("cancelled", outcome.booking.id, req.log, { cancelledBy: "guest", refundDue: outcome.refundDue });
+    }
   } catch (err) {
     next(err);
   }

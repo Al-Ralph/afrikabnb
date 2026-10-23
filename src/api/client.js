@@ -492,6 +492,31 @@ export const api = {
     return request(withQuery(`/api/listings/${enc(listingId)}/availability`, params));
   },
 
+  // --- Paiement (Mobile Money, CinetPay) ---
+  // { enabled, provider, currency } : enabled=false -> aucun élément de paiement affiché.
+  async getPaymentsConfig() {
+    return request("/api/payments/config", { auth: false });
+  },
+
+  // Voyageur connecté propriétaire de la réservation -> { transactionId, paymentUrl, amount, currency, … }.
+  // 409 non payable (non confirmée, annulée, échéance dépassée, déjà payée), 429 trop de tentatives.
+  async startBookingPayment(bookingId, lang) {
+    return request(`/api/bookings/${enc(bookingId)}/payments`, jsonBody("POST", lang ? { lang } : {}));
+  },
+
+  // Voyageur sans compte, par le jeton de son lien de suivi.
+  async startGuestPayment(token, lang) {
+    return request(`/api/guest-bookings/${enc(token)}/payments`, {
+      ...jsonBody("POST", lang ? { lang } : {}),
+      auth: false,
+    });
+  },
+
+  // Page de retour : statut vérifié côté serveur auprès du prestataire (jamais déduit du retour navigateur).
+  async getPaymentStatus(transactionId) {
+    return request(`/api/payments/${enc(transactionId)}/status`, { auth: false });
+  },
+
   // --- Avis ---
   async getReviews(listingId, { limit, offset } = {}) {
     const params = new URLSearchParams();
@@ -552,6 +577,25 @@ export const api = {
   // -> { listing: { id, rating, reviewCount } } (note recalculée)
   async deleteReview(reviewId) {
     return request(`/api/admin/reviews/${enc(reviewId)}`, { method: "DELETE" });
+  },
+
+  // Remboursements manuels : status "REFUND_DUE" (à effectuer) ou "REFUNDED".
+  async getAdminRefunds({ status, limit, offset } = {}) {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (limit != null) params.set("limit", String(limit));
+    if (offset != null) params.set("offset", String(offset));
+    return request(withQuery("/api/admin/refunds", params));
+  },
+
+  // Remboursement effectué hors application : REFUND_DUE -> REFUNDED.
+  async markRefunded(bookingId) {
+    return request(`/api/admin/bookings/${enc(bookingId)}/refunded`, { method: "PATCH" });
+  },
+
+  // Paiement isolé à rembourser (doublon, montant discordant) : REFUND_DUE -> REFUNDED.
+  async markPaymentRefunded(paymentId) {
+    return request(`/api/admin/payments/${enc(paymentId)}/refunded`, { method: "PATCH" });
   },
 };
 
