@@ -16,6 +16,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const GuestBooking = lazy(() => import("./pages/GuestBooking"));
 const Admin = lazy(() => import("./pages/Admin"));
+const PaymentReturn = lazy(() => import("./pages/PaymentReturn"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 const Cookies = lazy(() => import("./pages/legal/Cookies"));
@@ -40,6 +41,7 @@ const App = () => {
               <Route path="/reservation/:token" element={<GuestBooking />} />
               <Route path="/reservation" element={<GuestBooking />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/paiement/retour" element={<PaymentReturn />} />
               <Route path="/mentions-legales" element={<MentionsLegales />} />
               <Route path="/confidentialite" element={<Confidentialite />} />
               <Route path="/cookies" element={<Cookies />} />

@@ -1,4 +1,6 @@
 import * as adminService from "../../services/admin.js";
+import * as paymentsService from "../../services/payments.js";
+import { formatDay } from "../../utils/booking.js";
 import { listingToJson } from "../listings/listings.serializers.js";
 
 // Journal des actions d'administration (qui, quoi, sur quelle cible).
@@ -80,6 +82,68 @@ export async function reviews(req, res, next) {
     const { limit, offset } = req.query;
     const { data, total } = await adminService.listReviews({ limit, offset });
     res.json({ data, total, limit, offset });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Réservation à rembourser -> JSON (montants numériques, jours "YYYY-MM-DD").
+const refundToJson = ({ totalPrice, checkIn, checkOut, contactName, contactEmail, guest, payments, ...b }) => ({
+  ...b,
+  totalPrice: Number(totalPrice),
+  checkIn: formatDay(checkIn),
+  checkOut: formatDay(checkOut),
+  traveler: guest ? { name: guest.name, email: guest.email, account: true } : { name: contactName, email: contactEmail, account: false },
+  payments: (payments || []).map((p) => ({ ...p, amount: Number(p.amount) })),
+});
+
+// Paiement à rembourser isolément (doublon, montant discordant) -> JSON.
+const paymentRefundToJson = ({ amount, booking, ...p }) => ({
+  ...p,
+  amount: Number(amount),
+  booking: booking
+    ? {
+        id: booking.id,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        checkIn: formatDay(booking.checkIn),
+        checkOut: formatDay(booking.checkOut),
+        listing: booking.listing,
+        traveler: booking.guest
+          ? { name: booking.guest.name, email: booking.guest.email, account: true }
+          : { name: booking.contactName, email: booking.contactEmail, account: false },
+      }
+    : null,
+});
+
+// GET /api/admin/refunds?status=REFUND_DUE|REFUNDED&limit&offset
+export async function refunds(req, res, next) {
+  try {
+    const { status, limit, offset } = req.query;
+    const { data, total, payments } = await paymentsService.listRefunds({ status, limit, offset });
+    res.json({ data: data.map(refundToJson), total, limit, offset, payments: payments.map(paymentRefundToJson) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/admin/bookings/:id/refunded : remboursement effectué hors application.
+export async function markRefunded(req, res, next) {
+  try {
+    const booking = await paymentsService.markRefunded(req.params.id);
+    audit(req, "booking.refund.done", { bookingId: req.params.id });
+    res.json(refundToJson(booking));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/admin/payments/:id/refunded : paiement isolé remboursé hors application.
+export async function markPaymentRefunded(req, res, next) {
+  try {
+    const payment = await paymentsService.markPaymentRefunded(req.params.id);
+    audit(req, "payment.refund.done", { paymentId: req.params.id, transactionId: payment.transactionId });
+    res.json(paymentRefundToJson(payment));
   } catch (err) {
     next(err);
   }

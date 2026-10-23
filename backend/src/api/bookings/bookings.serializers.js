@@ -1,6 +1,7 @@
 import { listingToJson } from "../listings/listings.serializers.js";
 import { formatDay, nightsBetween, todayDay } from "../../utils/booking.js";
 import { effectiveStatus, pendingExpiresAt } from "../../utils/bookingStatus.js";
+import { PAYMENT_CURRENCY, payableAmount } from "../../utils/payment.js";
 
 // Colonnes jamais renvoyées telles quelles : fiche de contact (exposée seulement par
 // bookingWithContactToJson) et jeton d'accès sans compte (jamais exposé, même haché).
@@ -32,6 +33,11 @@ export function bookingToJson(booking, now) {
     // Date limite de réponse de l'hôte (demandes en attente uniquement).
     expiresAt: status === "PENDING" ? pendingExpiresAt(booking.createdAt).toISOString() : null,
   };
+  // Paiement attendu ou effectué : montant exact facturé (XOF, arrondi exigé par le prestataire).
+  if (booking.paymentStatus && booking.paymentStatus !== "NONE") {
+    out.paymentAmount = payableAmount(totalPrice);
+    out.paymentCurrency = PAYMENT_CURRENCY;
+  }
   if (listing) {
     out.currency = listing.currency;
     out.listing = listingToJson(listing);

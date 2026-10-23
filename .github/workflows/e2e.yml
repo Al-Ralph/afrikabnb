@@ -48,6 +48,10 @@ jobs:
       # X-Forwarded-For de confiance : chaque test Playwright présente sa propre adresse fictive
       # (e2e/fixtures.js), les limites de débit de l'API ne se cumulent pas sur toute la suite.
       TRUST_PROXY: 1
+      # Paiement Mobile Money avec le fournisseur SIMULÉ (aucun appel à CinetPay) : e2e/payment.spec.js
+      # paie une réservation via la page /api/payments/fake/… (refusée par l'API si NODE_ENV=production).
+      PAYMENTS_ENABLED: "true"
+      PAYMENT_PROVIDER: fake
       # Sortie du backend (logs JSON, e-mails de EMAIL_DRIVER=console) lue par les tests.
       E2E_BACKEND_LOG: ${{ github.workspace }}/e2e-logs/backend.log
     steps:

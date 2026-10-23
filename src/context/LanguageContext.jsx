@@ -4,6 +4,7 @@ import { designTranslations } from "./translations.design";
 import { travelerTranslations } from "./translations.traveler";
 import { hostTranslations } from "./translations.host";
 import { currencyTranslations } from "./translations.currency";
+import { paymentTranslations } from "./translations.payment";
 
 const STORAGE_KEY = "afrikabnb_lang";
 
@@ -20,11 +21,14 @@ export function mergeTranslations(base, extra) {
 }
 
 // Calculé une fois au chargement : translations.js (prioritaire), puis les fichiers
-// complémentaires (design, voyageur, hôte, devise), chacun ne pouvant qu'ajouter des clés.
-const translations = [designTranslations, travelerTranslations, hostTranslations, currencyTranslations].reduce(
-  mergeTranslations,
-  baseTranslations
-);
+// complémentaires (design, voyageur, hôte, devise, paiement), chacun ne pouvant qu'ajouter des clés.
+const translations = [
+  designTranslations,
+  travelerTranslations,
+  hostTranslations,
+  currencyTranslations,
+  paymentTranslations,
+].reduce(mergeTranslations, baseTranslations);
 
 const LanguageContext = createContext(null);
 

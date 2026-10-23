@@ -8,7 +8,18 @@
 // - La valeur EXPIRED est écrite en base quand une demande expirée est touchée (confirmation,
 //   refus, annulation) et par un balayage `updateMany` lors de la lecture des listes de réservations
 //   (voyageur / hôte), pour que la base finisse par refléter l'état réel.
+//
+// Paiement (PAYMENTS_ENABLED=true) : une réservation CONFIRMED non payée (paymentStatus UNPAID) à son
+// échéance (paymentDueAt) est traitée comme CANCELLED (statut exposé, disponibilités), puis annulée
+// en base par le balayage paresseux (services/bookings.js, sweepUnpaid).
 import { formatDay, todayDay } from "./booking.js";
+import { isPaymentOverdue } from "./payment.js";
+
+// Même source que config.payments.enabled (src/config/env.js, qui charge dotenv au démarrage) ; lu
+// directement ici pour que ce module reste pur et importable sans configuration.
+export function paymentsActive() {
+  return (process.env.PAYMENTS_ENABLED || "").trim().toLowerCase() === "true";
+}
 
 export const PENDING_TTL_MS = 48 * 60 * 60 * 1000;
 // Anti-abus : demandes en attente simultanées par voyageur, et durée maximale d'une demande.
@@ -39,9 +50,13 @@ export function isPendingExpired(booking, now = new Date()) {
   return toDay(booking.checkIn) < todayDay(now);
 }
 
-// Statut tel qu'exposé par l'API (PENDING expiré -> EXPIRED).
+// Statut tel qu'exposé par l'API (PENDING expiré -> EXPIRED ; CONFIRMED impayée à l'échéance -> CANCELLED).
 export function effectiveStatus(booking, now = new Date()) {
-  return isPendingExpired(booking, now) ? "EXPIRED" : booking.status;
+  if (isPendingExpired(booking, now)) return "EXPIRED";
+  // Paiements désactivés : jamais d'annulation implicite (comportement historique). Avant de les
+  // désactiver, solder les réservations UNPAID (voir DEPLOY.md, section 8).
+  if (paymentsActive() && isPaymentOverdue(booking, now)) return "CANCELLED";
+  return booking.status;
 }
 
 // Vrai si la réservation occupe ses dates (CONFIRMED, ou PENDING non expirée).
@@ -58,9 +73,24 @@ export function activePendingWhere(now = new Date()) {
   };
 }
 
+// Filtre Prisma des réservations CONFIRMED qui bloquent leurs dates. Paiements actifs : sauf celles
+// impayées à l'échéance.
+export function confirmedBlockingWhere(now = new Date(), withPayments = paymentsActive()) {
+  if (!withPayments) return { status: "CONFIRMED" };
+  return {
+    status: "CONFIRMED",
+    OR: [{ paymentStatus: { not: "UNPAID" } }, { paymentDueAt: null }, { paymentDueAt: { gt: now } }],
+  };
+}
+
+// Filtre Prisma des réservations CONFIRMED impayées à l'échéance (balayage paresseux -> CANCELLED).
+export function overdueUnpaidWhere(now = new Date()) {
+  return { status: "CONFIRMED", paymentStatus: "UNPAID", paymentDueAt: { lte: now } };
+}
+
 // Filtre Prisma équivalent à isBlocking (à combiner avec un filtre de dates).
-export function blockingBookingWhere(now = new Date()) {
-  return { OR: [{ status: "CONFIRMED" }, activePendingWhere(now)] };
+export function blockingBookingWhere(now = new Date(), withPayments = paymentsActive()) {
+  return { OR: [confirmedBlockingWhere(now, withPayments), activePendingWhere(now)] };
 }
 
 // Filtre Prisma des demandes PENDING expirées (balayage paresseux -> EXPIRED).

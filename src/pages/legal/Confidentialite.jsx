@@ -206,6 +206,18 @@ const Confidentialite = () => (
               annonces, dans une région de l’Union européenne pour la version mise en ligne.
             </li>
             <li>
+              <strong>CinetPay</strong> (Côte d’Ivoire) : prestataire de paiement Mobile Money,
+              uniquement lorsque le paiement en ligne est activé. AfrikaBnB lui transmet le montant,
+              la devise, une référence de transaction aléatoire, une description générique et la
+              référence technique de la réservation ; aucun nom, e-mail ni téléphone n’est transmis
+              par AfrikaBnB. Les données que vous saisissez sur la page de paiement de CinetPay
+              (numéro de téléphone Mobile Money, éventuellement nom ou e-mail) sont collectées
+              directement par CinetPay et par votre opérateur, sous leur propre responsabilité et
+              selon leur politique de confidentialité. AfrikaBnB conserve en retour le statut du
+              paiement, le moyen de paiement (ex. Orange Money) et la référence de l’opérateur,
+              pour la comptabilité et les remboursements.
+            </li>
+            <li>
               <strong>Resend</strong> (États-Unis) : envoi des e-mails transactionnels (suivi de
               réservation, réinitialisation du mot de passe) : adresse du destinataire et contenu
               du message.
@@ -237,6 +249,12 @@ const Confidentialite = () => (
             les accords de traitement des données de ces prestataires (clauses contractuelles
             types de la Commission européenne et, le cas échéant, Data Privacy Framework UE–États-Unis),
             dont l’éditeur vérifie l’applicabilité.
+          </p>
+          <p>
+            Lorsque le paiement en ligne est activé, les données de paiement décrites ci-dessus
+            sont transmises à CinetPay, établi en Côte d’Ivoire (hors Union européenne) : ce
+            transfert est nécessaire à l’exécution du paiement que vous demandez ; l’éditeur
+            vérifie les garanties contractuelles proposées par ce prestataire.
           </p>
           {/* APRÈS MIGRATION : retirer ce paragraphe (base de démonstration us-west-2). */}
           <p>

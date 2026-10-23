@@ -14,6 +14,8 @@ import bookingsRoutes from "./api/bookings/bookings.routes.js";
 import adminRoutes from "./api/admin/admin.routes.js";
 import guestBookingsRoutes from "./api/guestBookings/guestBookings.routes.js";
 import ratesRoutes from "./api/rates/rates.routes.js";
+import { createPaymentsRouter } from "./api/payments/payments.routes.js";
+import { startPaymentReconciler } from "./api/payments/payments.reconciler.js";
 import { UPLOADS_DIR } from "./services/storage/index.js";
 
 const app = express();
@@ -27,16 +29,19 @@ app.use(helmet());
 // refusé par src/config/env.js).
 app.use(cors({ origin: config.corsOrigins, credentials: true, exposedHeaders: ["WWW-Authenticate"] }));
 
-const limiter = (windowMs, limit) =>
+const limiter = (windowMs, limit, skip) =>
   rateLimit({
     windowMs,
     limit,
+    skip,
     standardHeaders: "draft-7",
     legacyHeaders: false,
     message: { error: "Trop de requêtes, réessayez plus tard" },
   });
 
-app.use("/api", limiter(15 * 60 * 1000, 300));
+// Notifications CinetPay exclues de la limite globale (serveurs du prestataire, protégées par le
+// HMAC x-token) : limite dédiée dans api/payments/payments.routes.js.
+app.use("/api", limiter(15 * 60 * 1000, 300, (req) => req.path === "/payments/cinetpay/notify"));
 const uploadLimiter = limiter(15 * 60 * 1000, 30);
 app.use(["/api/auth/login", "/api/auth/register"], limiter(15 * 60 * 1000, 10));
 // Limite stricte réservée au proxy Nominatim (1 req/s max côté OSM) ; listings-in-bounds
@@ -87,6 +92,8 @@ app.use("/api/bookings", bookingsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/guest-bookings", guestBookingsRoutes);
 app.use("/api/rates", ratesRoutes);
+// Paiements (PAYMENTS_ENABLED) : seule GET /api/payments/config existe si désactivés.
+app.use("/api", createPaymentsRouter());
 
 app.use((req, res) => {
   res.status(404).json({ error: "Route introuvable" });
@@ -97,6 +104,9 @@ app.use(errorHandler);
 const server = app.listen(config.port, () => {
   logger.info(`AfrikaBnB API listening on http://localhost:${config.port}`);
 });
+
+// Réconciliation périodique des paiements (PAYMENTS_ENABLED, hors NODE_ENV=test) : non bloquante.
+startPaymentReconciler({ settings: config.payments, nodeEnv: config.nodeEnv, log: logger });
 
 function shutdown(signal) {
   logger.info(`${signal} reçu, arrêt de l'API...`);

@@ -29,6 +29,30 @@ enum BookingStatus {
   EXPIRED
 }
 
+// Paiement d'une réservation (vague 6, PAYMENTS_ENABLED=true). NONE : aucun paiement attendu
+// (paiements désactivés, demande en attente, réservations antérieures). UNPAID : confirmée, à payer
+// avant paymentDueAt (sinon annulée par balayage paresseux). REFUND_DUE : payée puis annulée (ou
+// payée après annulation / échéance), remboursement manuel par l'administrateur hors application.
+enum BookingPaymentStatus {
+  NONE
+  UNPAID
+  PAID
+  REFUND_DUE
+  REFUNDED
+}
+
+// Tentative de paiement auprès du prestataire. FAILED : initialisation refusée par le prestataire.
+// REFUND_DUE -> REFUNDED : paiement encaissé à rembourser isolément (doublon sur une réservation déjà
+// payée, montant ou devise discordants : rawStatus "AMOUNT_MISMATCH").
+enum PaymentStatus {
+  PENDING
+  ACCEPTED
+  REFUSED
+  FAILED
+  REFUND_DUE
+  REFUNDED
+}
+
 enum ListingStatus {
   ACTIVE
   HIDDEN
@@ -195,12 +219,48 @@ model Booking {
   guestAccessTokenHash String?   @unique @db.Char(64)
   guestAccessExpiresAt DateTime?
 
-  review Review?
+  // Paiement (voir enum BookingPaymentStatus) ; montant facturé : totalPrice en XOF.
+  paymentStatus BookingPaymentStatus @default(NONE)
+  paymentDueAt  DateTime?
+  paidAt        DateTime?
+
+  review   Review?
+  payments Payment[]
 
   @@index([listingId, checkIn, checkOut])
   @@index([guestId])
   @@index([status, createdAt])
   @@index([contactEmail])
+  @@index([paymentStatus, paymentDueAt])
+}
+
+// Tentative de paiement (CinetPay ou fournisseur simulé `fake`). transactionId : identifiant envoyé
+// au prestataire (aléatoire, non devinable, unique). Le statut n'est jamais déduit de la seule
+// notification ni du retour navigateur : toujours confirmé par l'API de vérification du prestataire.
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider      String        @db.VarChar(20)
+  transactionId String        @unique @db.VarChar(64)
+  // Montant entier facturé (XOF, multiple de 5 exigé par CinetPay).
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @db.VarChar(3)
+  status        PaymentStatus @default(PENDING)
+  paymentUrl    String?       @db.VarChar(2048)
+  // payment_token CinetPay (initialisation).
+  providerRef   String?       @db.VarChar(255)
+  // operator_id (référence de l'opérateur Mobile Money) et payment_method (OM, MOMO, FLOOZ…).
+  operatorId    String?       @db.VarChar(255)
+  method        String?       @db.VarChar(50)
+  // Dernier statut brut renvoyé par le prestataire (ACCEPTED, REFUSED, WAITING_FOR_CUSTOMER…).
+  rawStatus     String?       @db.VarChar(100)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  paidAt        DateTime?
+
+  @@index([bookingId, createdAt])
+  @@index([status])
 }
 
 model Review {

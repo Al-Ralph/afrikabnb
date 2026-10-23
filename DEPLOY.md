@@ -235,6 +235,73 @@ Render → service `afrikabnb-api` → **Environment** :
 5. `backend/.env` local : le garder pour le développement (base locale ou ancienne base), ne
    jamais y mettre la clé de la nouvelle base si le poste est partagé.
 
+## 8. Paiement Mobile Money : CinetPay (facultatif)
+
+Désactivé par défaut (`PAYMENTS_ENABLED=false` dans `render.yaml`) : l'application fonctionne
+exactement comme avant (aucun bouton, aucun paiement demandé). Pour l'activer :
+
+1. **Compte marchand** : créer un compte sur [cinetpay.com](https://cinetpay.com) (pays du compte :
+   Togo → devise **XOF** ; CinetPay n'encaisse que dans la devise locale du compte), puis souscrire
+   un **service** (c'est lui qui fournit le `site_id`).
+2. **Clés** : back-office CinetPay → menu **Intégrations** : `apikey` → `CINETPAY_API_KEY`,
+   `site_id` → `CINETPAY_SITE_ID`, **Secret Key** → `CINETPAY_SECRET_KEY` (elle sert à vérifier
+   l'en-tête `x-token` HMAC-SHA256 de chaque notification). Render → Environment ; ne jamais les
+   mettre dans Vercel ni dans une variable `VITE_*`.
+3. **Mode test** : la documentation CinetPay indique que les *sandbox* sont « momentanément
+   indisponibles » et que la même `apikey` / le même `site_id` servent au test et à la production
+   (un service ou un compte distinct peut être créé pour la production). Tester avec de **petits
+   montants réels** (minimum 150 XOF au Togo, 100 XOF ailleurs ; maximum 1 500 000 XOF) puis
+   rembourser depuis le back-office ; en local et en CI, utiliser `PAYMENT_PROVIDER=fake` (page de
+   paiement simulée, refusée en production).
+4. **URL de notification** : l'API envoie à chaque paiement
+   `notify_url = ${API_PUBLIC_URL}/api/payments/cinetpay/notify` et
+   `return_url = ${API_PUBLIC_URL}/api/payments/return?tx=…`.
+   **Choix retenu : l'URL Vercel** (`API_PUBLIC_URL` vide = `APP_URL`, soit
+   `https://<projet>.vercel.app/api/payments/cinetpay/notify`, transmise à Render par la réécriture
+   `/api/*` de `vercel.json`) : domaine stable (identique si Render change d'URL), HTTPS, même
+   origine que le site pour le retour du navigateur. Alternative : l'URL Render directe
+   (`API_PUBLIC_URL=https://afrikabnb-api.onrender.com`), un intermédiaire de moins mais une URL
+   liée à l'hébergeur. Si le back-office demande une URL de notification, y saisir la même.
+   Elle doit répondre `200` en `GET` (test de disponibilité de CinetPay) : vérifier avec
+   `curl -i https://<projet>.vercel.app/api/payments/cinetpay/notify`.
+5. Render → `PAYMENTS_ENABLED=true` (`PAYMENT_PROVIDER=cinetpay`), redéployer. L'API refuse de
+   démarrer s'il manque une clé. **La migration `20261023000000_payments` doit être appliquée**
+   (le conteneur exécute `prisma migrate deploy` au démarrage).
+6. **Test de bout en bout** : réservation instantanée connectée → « Payer avec Mobile Money » →
+   paiement sur le guichet CinetPay → retour sur `/paiement/retour` : « Paiement reçu » ; dans le
+   profil, badge « Payée » ; e-mails « Paiement reçu » au voyageur et à l'hôte.
+
+Fonctionnement et limites :
+
+- Le statut n'est **jamais** déduit de la notification ni du retour navigateur : l'API vérifie le
+  `x-token` (comparaison à temps constant), puis interroge toujours `POST /v2/payment/check`, et
+  contrôle `site_id`, montant et devise avant de marquer la réservation payée.
+- **Offre gratuite Render** : l'API s'endort après ~15 min ; une notification reçue au réveil
+  (~50 s) peut expirer côté CinetPay. Sans conséquence grave : la notification peut être renvoyée,
+  et la page de retour redemande le statut à CinetPay (au plus toutes les 10 s). Un plan payant
+  évite ce délai.
+- **Remboursements** : manuels. Une réservation payée puis annulée (ou un paiement reçu après
+  annulation / échéance) passe en « remboursement en cours » ; les administrateurs reçoivent un
+  e-mail. Rembourser depuis le back-office CinetPay (ou par transfert Mobile Money), puis
+  **Administration → Remboursements → Marquer remboursé**.
+- Délais : `PAYMENT_DUE_MINUTES_INSTANT` (défaut 30) et `PAYMENT_DUE_HOURS_REQUEST` (défaut 24) ;
+  passé ce délai, les dates de la réservation non payée sont libérées immédiatement. Elle est
+  annulée en base (e-mails) après un délai de grâce de 15 min, par la réconciliation périodique
+  (toutes les 3 min) ou à la lecture des listes voyageur / hôte, **après une dernière vérification**
+  de son paiement en cours auprès de CinetPay (prestataire injoignable : pas d'annulation, nouvel essai).
+- **Notifications** : l'API répond `200` une fois la notification traitée, `503` si la vérification
+  auprès de CinetPay échoue (CinetPay la renvoie). La réconciliation périodique revérifie aussi les
+  paiements en attente depuis plus de 2 min (notification perdue).
+- **Désactiver les paiements** (`PAYMENTS_ENABLED=false`) : une réservation encore `UNPAID` redevient
+  une réservation confirmée ordinaire (plus d'échéance). Avant de désactiver, solder ces réservations :
+  attendre que la réconciliation les ait traitées (échéance + 15 min), puis vérifier dans le SQL
+  Editor qu'il n'en reste aucune :
+  `select id, "paymentDueAt" from "Booking" where status = 'CONFIRMED' and "paymentStatus" = 'UNPAID';`
+  (les annuler depuis l'application, ou les laisser confirmées en connaissance de cause). Traiter
+  aussi les remboursements en attente (Administration → Remboursements).
+- Pages légales : CinetPay figure comme prestataire (Confidentialité, CGU, Cookies) ; faire relire
+  la politique d'annulation / remboursement avant toute exploitation commerciale.
+
 ## Variables par service
 
 ### Render (`afrikabnb-api`)
@@ -257,6 +324,10 @@ Render → service `afrikabnb-api` → **Environment** :
 | `EMAIL_FROM` | `<À_REMPLACER_AfrikaBnB <no-reply@domaine>>` | Domaine vérifié dans Resend |
 | `CORS_ORIGIN` | `<À_REMPLACER_https://projet.vercel.app>` | Vercel → Project → Domains |
 | `APP_URL` | idem `CORS_ORIGIN` | Vercel → Project → Domains |
+| `PAYMENTS_ENABLED` / `PAYMENT_PROVIDER` | `false` / `cinetpay` | `render.yaml` (étape 8 pour activer) |
+| `PAYMENT_DUE_MINUTES_INSTANT` / `PAYMENT_DUE_HOURS_REQUEST` | `30` / `24` | `render.yaml` |
+| `CINETPAY_API_KEY` / `CINETPAY_SITE_ID` / `CINETPAY_SECRET_KEY` | `<À_REMPLACER>` | CinetPay → Intégrations (secrets) |
+| `API_PUBLIC_URL` | vide (= `APP_URL`) | étape 8 (URL de notification) |
 
 **TRUST_PROXY = 2** : la requête traverse la réécriture Vercel puis le répartiteur de Render.
 Vercel remplace `X-Forwarded-For` par l'IP du visiteur, Render y ajoute l'IP de Vercel : avec 2,
