@@ -27,6 +27,8 @@ vi.mock("./pages/legal/Cookies", () => ({ default: () => null }));
 vi.mock("./pages/legal/CGU", () => ({ default: () => null }));
 vi.mock("./pages/ResetPassword", () => ({ default: () => <div>ResetPasswordPage</div> }));
 vi.mock("./pages/Admin", () => ({ default: () => <div>AdminPage</div> }));
+vi.mock("./pages/Checkout", () => ({ default: () => <div>CheckoutPage</div> }));
+vi.mock("./pages/GuestBooking", () => ({ default: () => <div>GuestBookingPage</div> }));
 
 const routeElement = (path) => document.querySelector(`[data-path="${path}"]`);
 
@@ -42,5 +44,13 @@ describe("App routes (wave 3)", () => {
     await screen.findByText("AdminPage");
     expect(routeElement("/admin")).toHaveTextContent("AdminPage");
     expect(screen.getByText("Header")).toBeInTheDocument();
+  });
+
+  test("booking step and guest booking tracking pages are wired (lazy)", async () => {
+    render(<App />);
+    await screen.findByText("CheckoutPage");
+    expect(routeElement("/reserver/:id")).toHaveTextContent("CheckoutPage");
+    expect(routeElement("/reservation/:token")).toHaveTextContent("GuestBookingPage");
+    expect(routeElement("/reservation")).toHaveTextContent("GuestBookingPage");
   });
 });

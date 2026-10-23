@@ -121,4 +121,41 @@ describe("HostBookings", () => {
     expect(within(itemOf("Ama")).getByText("Expirée")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Accepter" })).not.toBeInTheDocument();
   });
+
+  test("shows the guest's contact sheet (mailto, tel, country, arrival, message) and a « Sans compte » badge", () => {
+    const guestCheckout = {
+      ...base,
+      id: "g9",
+      status: "PENDING",
+      expiresAt: inHours(10),
+      guest: null,
+      guestId: null,
+      guestAccount: false,
+      contact: {
+        name: "Akosua Boateng",
+        email: "akosua@example.com",
+        phone: "+233 24 000 0000",
+        country: "GH",
+        arrivalTime: "18:30",
+        message: "Arrivée tardive\nMerci !",
+      },
+    };
+    renderBookings([guestCheckout]);
+    const item = screen.getByRole("region", { name: /Coordonnées du voyageur/ }).closest("li");
+    const scope = within(item);
+    expect(scope.getByText("Akosua Boateng", { selector: ".host-booking-name" })).toBeInTheDocument();
+    expect(scope.getByText("Sans compte")).toBeInTheDocument();
+    expect(scope.getByRole("link", { name: "akosua@example.com" })).toHaveAttribute("href", "mailto:akosua@example.com");
+    expect(scope.getByRole("link", { name: "+233 24 000 0000" })).toHaveAttribute("href", "tel:+233240000000");
+    expect(scope.getByText("Ghana")).toBeInTheDocument();
+    expect(scope.getByText("18:30")).toBeInTheDocument();
+    expect(scope.getByText(/Arrivée tardive/)).toBeInTheDocument();
+    expect(scope.getByText("Informations saisies par le voyageur")).toBeInTheDocument();
+  });
+
+  test("a booking without contact details says so; members have no « Sans compte » badge", () => {
+    renderBookings([{ ...confirmed, guestAccount: true, contact: null }]);
+    expect(within(itemOf("Kofi")).getByText("Aucune coordonnée transmise pour cette réservation.")).toBeInTheDocument();
+    expect(screen.queryByText("Sans compte")).not.toBeInTheDocument();
+  });
 });

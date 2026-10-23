@@ -82,7 +82,7 @@ const cancelled = {
 const kofi = { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi", avatar: null };
 
 function setup({ user = kofi, bookings = [upcoming, pastToReview, pastReviewed, cancelled] } = {}) {
-  const auth = { user, loading: false, openAuth: vi.fn(), updateUser: vi.fn() };
+  const auth = { user, loading: false, openAuth: vi.fn(), updateUser: vi.fn(), logoutAll: vi.fn() };
   useAuth.mockReturnValue(auth);
   api.getMyBookings.mockResolvedValue(bookings);
   render(
@@ -322,6 +322,31 @@ describe("Profile page", () => {
       fireEvent.click(screen.getByRole("button", { name: "Changer le mot de passe" }));
       expect(await screen.findByText("Mot de passe modifié.")).toBeInTheDocument();
       expect(screen.getByLabelText("Mot de passe actuel")).toHaveValue("");
+    });
+
+    test("sessions: 'log out of all devices' asks for confirmation then calls logoutAll", async () => {
+      const auth = setup({ bookings: [] });
+      await bookingsLoaded();
+      const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+      const button = screen.getByRole("button", { name: "Se déconnecter de tous les appareils" });
+      fireEvent.click(button);
+      expect(confirm).toHaveBeenCalledWith("Se déconnecter de tous les appareils, y compris celui-ci ?");
+      expect(auth.logoutAll).not.toHaveBeenCalled();
+      auth.logoutAll.mockResolvedValue(undefined);
+      fireEvent.click(button);
+      await waitFor(() => expect(auth.logoutAll).toHaveBeenCalledTimes(1));
+      confirm.mockRestore();
+    });
+
+    test("sessions: an API error is shown and the button is enabled again", async () => {
+      const auth = setup({ bookings: [] });
+      await bookingsLoaded();
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      auth.logoutAll.mockRejectedValue(Object.assign(new Error("Erreur serveur"), { status: 500 }));
+      fireEvent.click(screen.getByRole("button", { name: "Se déconnecter de tous les appareils" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Impossible de fermer les sessions");
+      expect(screen.getByRole("button", { name: "Se déconnecter de tous les appareils" })).toBeEnabled();
+      confirm.mockRestore();
     });
   });
 });

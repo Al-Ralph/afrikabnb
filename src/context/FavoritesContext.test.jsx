@@ -6,7 +6,8 @@ import { api } from "../api/client";
 
 vi.mock("../api/client", () => ({
   api: {
-    getMe: vi.fn(),
+    refreshSession: vi.fn(),
+    logout: vi.fn(),
     getFavorites: vi.fn(),
     addFavorite: vi.fn(),
     removeFavorite: vi.fn(),
@@ -34,8 +35,7 @@ function deferred() {
 }
 
 async function renderLoggedIn(initialFavorites = []) {
-  localStorage.setItem("afrikabnb_token", "tok");
-  api.getMe.mockResolvedValue({ user: { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi" } });
+  api.refreshSession.mockResolvedValue({ token: "tok", user: { id: "u1", email: "kofi@afrikabnb.com", name: "Kofi" } });
   api.getFavorites.mockResolvedValue(initialFavorites);
   const view = renderHook(useBoth, { wrapper });
   await waitFor(() => expect(view.result.current.auth.user).not.toBeNull());
@@ -156,8 +156,7 @@ describe("FavoritesContext", () => {
   });
 
   test("a load error is exposed and reload retries", async () => {
-    localStorage.setItem("afrikabnb_token", "tok");
-    api.getMe.mockResolvedValue({ user: { id: "u1", email: "k@a.com" } });
+    api.refreshSession.mockResolvedValue({ token: "tok", user: { id: "u1", email: "k@a.com" } });
     api.getFavorites.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce([villa]);
     const { result } = renderHook(useBoth, { wrapper });
     await waitFor(() => expect(result.current.fav.error).not.toBeNull());

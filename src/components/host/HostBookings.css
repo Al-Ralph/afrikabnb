@@ -1,0 +1,66 @@
+/* Fiche de contact du voyageur dans une réservation reçue (pleine largeur de la carte). */
+.host-contact {
+  grid-column: 1 / -1;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.host-contact-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2) !important;
+  font-weight: 600;
+}
+
+.host-contact-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.host-contact-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.host-contact-list dt,
+.host-contact-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.host-contact-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.host-contact-list a {
+  color: var(--color-primary);
+}
+
+.host-contact-message {
+  margin-top: var(--space-3);
+}
+
+.host-contact-message blockquote {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.host-contact-note {
+  margin-top: var(--space-2) !important;
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+}

@@ -157,3 +157,13 @@ describe("Header — roles", () => {
     expect(within(menu()).getByRole("link", { name: "Espace hôte" })).toBeInTheDocument();
   });
 });
+
+describe("Header — currency selector", () => {
+  test("the display currency selector sits next to the language selector", () => {
+    setup();
+    const language = screen.getByText("LanguageSelector");
+    const currency = screen.getByRole("button", { name: /^Devise d'affichage/ });
+    expect(currency).toHaveTextContent("XOF");
+    expect(language.nextElementSibling).toContainElement(currency);
+  });
+});

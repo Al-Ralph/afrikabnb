@@ -1,7 +1,7 @@
 // Formatage partagé (cartes, fiche, profil, espace hôte, carte) : montants, jours "YYYY-MM-DD", nuits.
 
 // Devises sans sous-unité affichée (francs CFA…).
-const ZERO_DECIMAL = new Set(["XOF", "XAF", "JPY", "KRW", "GNF", "RWF", "UGX", "BIF", "DJF", "KMF"]);
+export const ZERO_DECIMAL = new Set(["XOF", "XAF", "JPY", "KRW", "GNF", "RWF", "UGX", "BIF", "DJF", "KMF"]);
 
 export function formatPrice(amount, currency = "XOF", locale = "fr") {
   const value = Number(amount);

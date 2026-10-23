@@ -56,6 +56,41 @@ const Confidentialite = () => (
                   <td>Conservé en base tant que le compte ou l’annonce existe</td>
                 </tr>
                 <tr>
+                  <td>Coordonnées de réservation (avec ou sans compte)</td>
+                  <td>
+                    Nom complet, e-mail, téléphone, pays, heure d’arrivée estimée et message à l’hôte
+                    (facultatifs), acceptation des CGU
+                  </td>
+                  <td>
+                    Transmettre vos coordonnées à l’hôte du logement réservé (et à lui seul) pour
+                    organiser le séjour ; vous envoyer les e-mails de suivi de la réservation
+                  </td>
+                  <td>Exécution du contrat / mesures précontractuelles (demande de réservation)</td>
+                  <td>
+                    Conservées avec la réservation ; durée de conservation envisagée : 3 ans au plus
+                    après la fin du séjour, sous réserve des obligations légales (purge automatique
+                    non encore en place)
+                  </td>
+                </tr>
+                <tr>
+                  <td>Réservation sans compte</td>
+                  <td>
+                    Coordonnées ci-dessus ; jeton du lien de suivi (seule son empreinte SHA-256 est
+                    conservée en base)
+                  </td>
+                  <td>
+                    Permettre de réserver sans créer de compte, puis de suivre ou d’annuler la demande
+                    via le lien personnel reçu par e-mail ; limiter les abus (nombre de demandes en
+                    attente par adresse e-mail, par adresse IP)
+                  </td>
+                  <td>Exécution du contrat / intérêt légitime (prévention des abus)</td>
+                  <td>
+                    Lien valable jusqu’à 30 jours après la date de départ ; réservation conservée
+                    comme ci-dessus. Une réservation sans compte n’est jamais rattachée à un compte
+                    existant
+                  </td>
+                </tr>
+                <tr>
                   <td>Avis</td>
                   <td>Note (1 à 5), commentaire, lien avec le séjour</td>
                   <td>Publier un retour sur un logement et calculer sa note moyenne ; affichés publiquement avec le nom et l’avatar</td>
@@ -77,11 +112,11 @@ const Confidentialite = () => (
                   <td>Conservé en base jusqu’à suppression de l’annonce ou du compte</td>
                 </tr>
                 <tr>
-                  <td>Session JWT</td>
-                  <td>Jeton d’authentification</td>
-                  <td>Maintenir la connexion</td>
+                  <td>Session</td>
+                  <td>Jeton d’accès (JWT) ; jeton de renouvellement aléatoire, dont seule l’empreinte SHA-256 est conservée en base avec la date de création et le navigateur (user-agent)</td>
+                  <td>Maintenir la connexion ; fermer les sessions (déconnexion, « tous les appareils », changement de mot de passe)</td>
                   <td>Intérêt légitime / exécution du contrat</td>
-                  <td>localStorage navigateur ; JWT expire après 1 jour (par défaut)</td>
+                  <td>Jeton d’accès en mémoire uniquement, 15 minutes (plus rien dans le localStorage) ; cookie httpOnly afrikabnb_rt, 30 jours, supprimé à la déconnexion ; empreintes expirées purgées à la connexion suivante, toutes supprimées avec le compte</td>
                 </tr>
                 <tr>
                   <td>Préférence de langue</td>
@@ -143,6 +178,14 @@ const Confidentialite = () => (
 
         <section className="legal-section">
           <h2>3. Destinataires</h2>
+          <p>
+            <strong>Hôte du logement réservé</strong> : lorsque vous réservez (avec ou sans compte),
+            les coordonnées saisies dans le formulaire de réservation (nom, e-mail, téléphone, pays,
+            heure d’arrivée et message) sont transmises à l’hôte de ce logement, dans son espace hôte
+            et par e-mail, pour organiser votre séjour. L’hôte agit alors sous sa propre
+            responsabilité ; il ne doit utiliser ces données que pour ce séjour. Elles ne sont
+            visibles ni des autres utilisateurs ni du public.
+          </p>
           <p>
             Données de compte, annonces, réservations, avis et favoris : l’éditeur et son
             hébergeur de base de données, <strong>Supabase</strong> (PostgreSQL, sous-traitant

@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useFavorites } from "../context/FavoritesContext";
-import { formatPrice } from "../utils/format";
+import { useCurrency } from "../context/CurrencyContext";
 import { interpolate } from "../utils/plural";
 import Icon, { StarIcon } from "./Icons";
 import "./PropertyCard.css";
@@ -18,6 +18,7 @@ const MAX_PHOTOS = 5;
 
 const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rating, reviewCount, image, imageUrl, images }) => {
   const { t, language } = useLanguage();
+  const { formatAmount } = useCurrency();
   const displayPrice = price != null ? price : pricePerNight;
   const cover = image || imageUrl;
   // Petit carrousel (5 photos max) si l'annonce en a plusieurs : une seule image chargée à la fois.
@@ -106,7 +107,7 @@ const PropertyCard = ({ id, location, title, price, pricePerNight, currency, rat
           <p className="property-card-title">{title}</p>
           <p className="property-card-price">
             {/* Annonces API : devise de l'annonce ; données de démo (sans devise) : dollars. */}
-            <strong>{currency ? formatPrice(displayPrice, currency, language) : `$${displayPrice}`}</strong>{" "}
+            <strong>{currency ? formatAmount(displayPrice, currency) : `$${displayPrice}`}</strong>{" "}
             {t("common.night")}
           </p>
         </div>

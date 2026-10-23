@@ -124,8 +124,24 @@ Le seed est idempotent (relançable sans doublon) : 20 annonces réparties sur l
 | `npm test` | racine | Vitest + Testing Library, exécution unique (`npm run test:watch` pour le mode watch) : 214 tests |
 | `npm test` | `backend/` | `node --test` : 22 tests sur la logique métier (nuits, prix, chevauchement de dates, moyenne des notes, filtres de recherche) |
 | `npm run build` | racine | Build de production dans `build/` |
-| `npm run lint` | racine | ESLint (config plate `eslint.config.js` : règles react-app, hooks, accessibilité JSX) |
+| `npm run lint` | racine | ESLint (config plate `eslint.config.js` : règles react-app, hooks, accessibilité JSX ; `src/`, `e2e/` et `playwright.config.js`) |
+| `npm run e2e:readonly` | racine | Playwright, parcours en **lecture seule** (`@readonly`) dans un vrai Chromium, contre les serveurs de développement |
+| `npm run e2e` | racine | Playwright, suite complète (écrit dans la base) : **CI uniquement** (workflow `e2e.yml`) |
 | `npm audit` | `backend/` | 0 vulnérabilité au 21/10/2026 |
+
+### Tests de bout en bout (Playwright)
+
+Les tests sont dans `e2e/` (config `playwright.config.js` : Chromium, `baseURL` http://localhost:3000, langue forcée en français, bandeau cookies refusé au début de chaque parcours, traces et captures conservées en cas d'échec, projet mobile 390 px pour les parcours tagués `@mobile`). Vitest ne les ramasse pas (`test.include` limité à `src/`).
+
+**En local : lecture seule uniquement.** La base de développement (Supabase) est partagée : seuls les parcours `@readonly` (accueil, recherche « Lome » → Lomé, catégories, panneau Filtres et tri, fiche logement et visionneuse au clavier, `/carte`, devise d'affichage, langue, pages légales, 404, mode sombre, absence d'erreurs console et de débordement horizontal en 390 px) s'exécutent sur un poste. Ils n'envoient que des lectures à l'API.
+
+```bash
+npx playwright install chromium   # une fois (ou E2E_CHANNEL=msedge pour utiliser Edge installé)
+npm run dev                       # frontend :3000 ; backend démarré à part (cd backend && npm run dev)
+npm run e2e:readonly              # = npx playwright test --grep @readonly
+```
+
+**Suite complète : CI uniquement.** Les autres parcours écrivent dans la base : inscription et restauration de session par le cookie httpOnly, déconnexion, favoris, réservation instantanée puis annulation, réservation sans compte et lien de suivi, refus d'une demande par l'hôte (fiche de contact), mot de passe oublié (lien relevé dans la sortie console du backend), création et suppression d'une annonce avec photo, administration (si `SEED_ADMIN_PASSWORD` est défini). Ils tournent dans `.github/workflows/e2e.yml` sur une base PostgreSQL 16 jetable (migrations + seed, secrets générés dans le job). Garde-fou : hors CI, `playwright.config.js` ne retient que les tests `@readonly`, même avec `npm run e2e` (sauf `E2E_ALLOW_WRITE=1`, à réserver à une base locale jetable). En CI, le backend tourne avec `TRUST_PROXY=1` et chaque test présente une adresse `X-Forwarded-For` fictive, pour que les limites de débit de l'API ne s'appliquent pas à toute la suite d'un coup. En cas d'échec, le rapport HTML, les traces et les logs des serveurs sont publiés en artefact `playwright-report`.
 
 Taille du build (gzip) : bundle principal ≈ 119 kB (Vite 8), sans autre chunk significatif (la scène 3D three.js a été retirée le 22/10/2026).
 

@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
+import { useCurrency } from "../../context/CurrencyContext";
 import { api, toIsoDay } from "../../api/client";
-import { formatPrice, formatDay } from "../../utils/format";
+import { formatDay } from "../../utils/format";
 import { interpolate } from "../../utils/plural";
+import { countryName } from "../booking/countries";
 import ConfirmButton from "./ConfirmButton";
 import EmptyState from "../EmptyState";
+import "./HostBookings.css";
 
 export const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "DECLINED", "EXPIRED", "CANCELLED"];
 const FILTERS = ["ALL", ...BOOKING_STATUSES];
@@ -28,6 +31,71 @@ export function formatRemaining(ms, language) {
   return minutes ? `${unit(hours, "hour")} ${unit(minutes, "minute")}` : unit(hours, "hour");
 }
 
+// Liens de contact : e-mail (validé par l'API) et numéro réduit à ses chiffres et au « + » initial.
+const mailtoHref = (email) => `mailto:${encodeURIComponent(email).replace(/%40/g, "@")}`;
+const telHref = (phone) => `tel:${String(phone).replace(/(?!^\+)[^\d]/g, "")}`;
+
+// Fiche de contact saisie par le voyageur (visible par l'hôte de l'annonce uniquement).
+const ContactCard = ({ booking, t, language }) => {
+  const c = booking.contact;
+  const titleId = `host-contact-${booking.id}`;
+  return (
+    <section className="host-contact" aria-labelledby={titleId}>
+      <p id={titleId} className="host-contact-title">
+        {t("host.contact.title")}
+        {booking.guestAccount === false && <span className="host-contact-badge">{t("host.contact.noAccount")}</span>}
+      </p>
+      {c ? (
+        <>
+          <dl className="host-contact-list">
+            <div>
+              <dt>{t("host.contact.name")}</dt>
+              <dd>{c.name}</dd>
+            </div>
+            {c.email && (
+              <div>
+                <dt>{t("host.contact.email")}</dt>
+                <dd>
+                  <a href={mailtoHref(c.email)}>{c.email}</a>
+                </dd>
+              </div>
+            )}
+            {c.phone && (
+              <div>
+                <dt>{t("host.contact.phone")}</dt>
+                <dd>
+                  <a href={telHref(c.phone)}>{c.phone}</a>
+                </dd>
+              </div>
+            )}
+            {c.country && (
+              <div>
+                <dt>{t("host.contact.country")}</dt>
+                <dd>{countryName(c.country, language)}</dd>
+              </div>
+            )}
+            {c.arrivalTime && (
+              <div>
+                <dt>{t("host.contact.arrivalTime")}</dt>
+                <dd>{c.arrivalTime}</dd>
+              </div>
+            )}
+          </dl>
+          {c.message && (
+            <div className="host-contact-message">
+              <p className="host-contact-label">{t("host.contact.message")}</p>
+              <blockquote>{c.message}</blockquote>
+            </div>
+          )}
+          <p className="host-contact-note">{t("host.contact.enteredByGuest")}</p>
+        </>
+      ) : (
+        <p className="host-muted">{t("host.contact.none")}</p>
+      )}
+    </section>
+  );
+};
+
 // Heure courante rafraîchie chaque minute (compte à rebours des demandes).
 function useNow(intervalMs = 60000) {
   const [now, setNow] = useState(() => Date.now());
@@ -42,6 +110,7 @@ function useNow(intervalMs = 60000) {
 // annulation des séjours confirmés à venir.
 const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
   const { t, language } = useLanguage();
+  const { formatAmount } = useCurrency();
   const [filter, setFilter] = useState("ALL");
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -52,12 +121,13 @@ const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
   const counts = withStatus.reduce((acc, b) => ({ ...acc, [b.displayStatus]: (acc[b.displayStatus] || 0) + 1 }), {});
   const visible = filter === "ALL" ? withStatus : withStatus.filter((b) => b.displayStatus === filter);
 
-  // La réponse peut être en vue voyageur : on conserve voyageur et annonce de la vue hôte.
+  // La réponse peut être en vue voyageur : on conserve voyageur, annonce et fiche de contact de la vue hôte.
   const merge = (booking, updated) => ({
     ...booking,
     ...updated,
     guest: updated?.guest || booking.guest,
     listing: booking.listing,
+    contact: updated?.contact || booking.contact,
   });
 
   const act = async (booking, action, successKey) => {
@@ -123,7 +193,7 @@ const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
       ) : (
         <ul className="host-bookings">
           {visible.map((b) => {
-            const guestName = b.guest?.name || t("host.guestUnknown");
+            const guestName = b.guest?.name || b.contact?.name || t("host.guestUnknown");
             const status = b.displayStatus;
             const canCancel = status === "CONFIRMED" && b.checkIn > todayIso;
             const remaining = status === "PENDING" && b.expiresAt ? Date.parse(b.expiresAt) - now : null;
@@ -160,7 +230,7 @@ const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
                   <span className={`host-status host-status--${String(status).toLowerCase()}`}>
                     {t(`host.status.${status}`)}
                   </span>
-                  <strong>{formatPrice(b.totalPrice, b.currency || b.listing?.currency, language)}</strong>
+                  <strong>{formatAmount(b.totalPrice, b.currency || b.listing?.currency)}</strong>
                   {status === "PENDING" && (
                     <div className="host-booking-actions">
                       <ConfirmButton
@@ -193,6 +263,7 @@ const HostBookings = ({ bookings, onBookingUpdated, onReload }) => {
                     />
                   )}
                 </div>
+                <ContactCard booking={b} t={t} language={language} />
               </li>
             );
           })}
