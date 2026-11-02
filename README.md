@@ -5,7 +5,43 @@ Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. P
 - **Frontend** : React 19 (Vite), à la racine du dépôt.
 - **Backend** : API REST Node.js / Express + Prisma + PostgreSQL (hébergé sur Supabase), dans `backend/` (documentation détaillée des endpoints : [`backend/README.md`](backend/README.md)).
 
-> Captures d’écran : non disponibles pour l’instant.
+![Accueil d’AfrikaBnB : photo aérienne de Lomé et barre de recherche](docs/screenshots/accueil.webp)
+
+---
+
+## Aperçu
+
+Captures du site en local avec les données de démonstration.
+
+### Recherche et annonces
+
+![Liste des séjours avec catégories, tri et filtres](docs/screenshots/annonces.webp)
+
+| Filtres (prix, équipements) | Devise d’affichage selon la région |
+|---|---|
+| ![Panneau de filtres par prix et équipements](docs/screenshots/filtres.webp) | ![Sélecteur de devise : prix convertis en euros](docs/screenshots/devise.webp) |
+
+### Fiche logement et réservation
+
+![Fiche logement : galerie photo, équipements et widget de réservation](docs/screenshots/logement.webp)
+
+![Étape de réservation : formulaire de contact transmis à l’hôte, réservation possible sans compte](docs/screenshots/reservation.webp)
+
+### Espace hôte
+
+| Tableau de bord | Mes annonces |
+|---|---|
+| ![Tableau de bord hôte : revenus, nuits, note, taux d’occupation](docs/screenshots/hote-tableau-de-bord.webp) | ![Gestion des annonces de l’hôte](docs/screenshots/hote-annonces.webp) |
+
+### Mode sombre et mobile
+
+![Accueil en mode sombre](docs/screenshots/accueil-sombre.webp)
+
+<p>
+  <img src="docs/screenshots/mobile-accueil.webp" alt="Accueil sur mobile" width="260">
+  &nbsp;
+  <img src="docs/screenshots/mobile-logement.webp" alt="Fiche logement sur mobile avec carrousel photo" width="260">
+</p>
 
 ---
 
@@ -25,17 +61,17 @@ Plateforme de réservation de logements en Afrique, sur le modèle d’Airbnb. P
 
 ## Fonctionnalités
 
-- **Recherche** : destination (texte recherché dans la ville et le titre, insensible à la casse et aux accents), dates (exclut les logements déjà réservés), nombre de voyageurs (≤ capacité), animaux acceptés, catégories (Piscines, Bord de mer, Safari, Cabanes, Tendance, OMG!, Parcs nationaux, Îles, Luxe). Les critères sont synchronisés dans l’URL.
-- **Fiche logement** avec widget de réservation : dates déjà réservées bloquées, total calculé (nuits × prix), contrôle anti double-réservation dans une transaction côté serveur.
-- **Avis** : possibles après le séjour, un par réservation ; la note moyenne de l’annonce est calculée à partir des avis.
-- **Favoris** persistés en base.
-- **Profil** (`/profil`) : nom, avatar, changement de mot de passe (ancien mot de passe exigé), mes réservations, annulation, dépôt d’avis.
-- **Espace hôte** (`/host`) : création / modification / suppression d’annonces (devise XOF, EUR, USD…, capacité, chambres, catégorie, coordonnées), réservations reçues.
+- **Recherche** : destination (insensible à la casse et aux accents : « Lome » trouve Lomé), dates (exclut les logements réservés ou bloqués), voyageurs, catégories, **filtres** prix et équipements, **tri** ; critères synchronisés dans l’URL.
+- **Fiche logement** : galerie et visionneuse plein écran, équipements, réservation instantanée ou **sur demande** (l’hôte accepte ou refuse sous 48 h), dates indisponibles bloquées, contrôle anti double-réservation côté serveur.
+- **Réservation sans compte** : formulaire de contact (nom, e-mail, téléphone, pays, heure d’arrivée, message) transmis à l’hôte, lien personnel pour suivre ou annuler ; pré-rempli pour les membres.
+- **Devise d’affichage** détectée selon la langue et le fuseau du navigateur (sans géolocalisation tierce), modifiable ; prix convertis à titre indicatif, montant facturé en francs CFA.
+- **Paiement Mobile Money** via CinetPay (désactivé par défaut, voir `DEPLOY.md`).
+- **Compte** : sessions par cookie httpOnly avec renouvellement, mot de passe oublié par e-mail, « se déconnecter de tous les appareils », profil, réservations et statuts, avis après le séjour, favoris.
+- **Espace hôte** (`/host`) : tableau de bord (revenus, taux d’occupation, prochaines arrivées), annonces avec photos par glisser-déposer, réservations reçues avec fiche de contact, périodes bloquées.
+- **Administration** (`/admin`) : utilisateurs et rôles, modération des annonces et des avis, remboursements.
 - **Carte** (`/carte`) : Google Maps avec marqueurs de prix ; repli en liste sans clé API ou sans consentement.
-- **Multilingue** : français, anglais, espagnol, allemand, portugais.
-- **Bandeau de consentement cookies** : Google Fonts et Google Maps ne sont chargés qu’après acceptation.
-- **Pages légales** : mentions légales, confidentialité, cookies, CGU.
-- **Bandeau d’accueil statique** (CSS seul, aucune image ni bibliothèque 3D) : affichage immédiat, aucune requête tierce.
+- **Interface** : 5 langues (français, anglais, espagnol, allemand, portugais), mode sombre, adaptée au mobile, installable (PWA).
+- **Vie privée** : bandeau de consentement (Google Fonts et Maps chargés seulement après acceptation), pages légales (mentions, confidentialité, cookies, CGU).
 
 ---
 
