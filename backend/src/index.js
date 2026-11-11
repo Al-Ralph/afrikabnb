@@ -52,6 +52,10 @@ app.use("/api/auth/forgot-password", limiter(15 * 60 * 1000, 5));
 app.use("/api/auth/reset-password", limiter(15 * 60 * 1000, 10));
 // Renouvellement de session : un appel par chargement de page / expiration du jeton d'accès.
 app.use("/api/auth/refresh", limiter(15 * 60 * 1000, 60));
+// Modification du profil (dont changement de mot de passe, qui vérifie le mot de passe actuel) :
+// limite stricte contre la force brute avec un jeton d'accès volé.
+const profileLimiter = limiter(15 * 60 * 1000, 20);
+app.use("/api/users/me", (req, res, next) => (req.method === "PATCH" ? profileLimiter(req, res, next) : next()));
 // Téléversement de photos (traitement sharp coûteux).
 app.use("/api/listings/:id/images", (req, res, next) => (req.method === "POST" ? uploadLimiter(req, res, next) : next()));
 // Suivi des réservations sans compte (jeton dans l'URL) : limite stricte contre l'énumération.
